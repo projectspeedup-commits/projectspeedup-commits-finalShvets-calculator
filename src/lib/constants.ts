@@ -37,6 +37,34 @@ export const DEFAULT_RAW_PRICES = DEFAULT_STEEL_GRADES.reduce((acc, grade) => ({
 
 export const sanitizeKey = (key: string) => key.replace(/\./g, '_');
 
+export const getGostForGrade = (grade: string) => {
+  if (!grade) return "";
+  const g = grade.toUpperCase().trim();
+  if (g.includes("09Г2С")) return "ГОСТ 19281-2014";
+  if (g === "20" || g === "СТ20" || g === "СТ.20") return "ГОСТ 1050-75";
+  if (g === "35" || g === "СТ35" || g === "СТ.35") return "ГОСТ 1050-74";
+  if (g === "45" || g === "СТ45" || g === "СТ.45") return "ГОСТ 1050-74";
+  
+  if (g.includes("10") || g.includes("20") || g.includes("35") || g.includes("40") || g.includes("45")) {
+    if (g.includes("Х") || g.includes("Г")) return "ГОСТ 4543";
+    return "ГОСТ 1050-2013";
+  }
+  if (g.includes("20Х") || g.includes("30Х") || g.includes("40Х") || g.includes("18ХГТ") || g.includes("25ХГТ") || g.includes("30ХГСА")) return "ГОСТ 4543";
+  if (g.includes("А12")) return "ГОСТ 1414";
+  return "ГОСТ 1050"; 
+};
+
+export const getProfileGost = (type: "round" | "hex") => {
+  return type === "round" ? "ГОСТ 7417-75" : "ГОСТ 8560-78";
+};
+
+export const getLengthLabel = (length: string) => {
+  const L = Number(length);
+  if (isNaN(L)) return "";
+  if (L === 6000) return "МД";
+  return "НД";
+};
+
 function generateRoundData(start: number, end: number, step: number, rawSizes: number[]) {
   const result: any[] = [];
   for (let target = start; target <= end; target += step) {

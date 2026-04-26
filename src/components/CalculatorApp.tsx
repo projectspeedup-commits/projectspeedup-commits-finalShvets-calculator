@@ -1,4 +1,4 @@
-import { DEFAULT_STEEL_GRADES, formatCurrency, formatInputValue, handleNumericInput, HEX_DATA, ROUND_DATA, TECH_COEFS_ROUND } from "../lib/constants";
+import { DEFAULT_STEEL_GRADES, formatCurrency, formatInputValue, getGostForGrade, getLengthLabel, getProfileGost, handleNumericInput, HEX_DATA, ROUND_DATA, TECH_COEFS_ROUND } from "../lib/constants";
 import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, Info, LogOut, Package, Printer, RotateCcw, Ruler, Scale } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PrintTemplate } from "./PrintTemplate";
@@ -383,76 +383,64 @@ export function CalculatorApp({
   };
 
   const handleCopy = () => {
-    let text = `Детали расчета (ООО "ЗМК Арсенал")\n`;
-    text += `-----------------------------------\n`;
-    text += `Марка стали: ${steelGrade || "Не выбрана"}\n`;
-    text += `Профиль: ${profileType === "round" ? "Круг" : "Шестигранник"} ${selectedTarget || "?"} мм\n`;
-    text += `Длина (отгрузка): ${orderedLength || "?"} мм\n`;
-    text += `Объем заказа: ${orderWeight || "?"} тонн\n\n`;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const gost = getGostForGrade(steelGrade);
+    const profileGost = getProfileGost(profileType);
+    const lengthLabel = getLengthLabel(orderedLength);
+    const rawPriceNum = Number(currentAdminRawPrice) || 0;
+    const sellPriceNum = Number(sellPrice) || 0;
+    const orderWeightNum = Number(orderWeight) || 0;
+    const scrapPriceNum = Number(adminScrapPrice) || 0;
+    const remnantPriceNum = Number(effectiveRemnantPrice) || 0;
 
+    let text = `Детали расчета (ООО "ЗМК Арсенал") - ${dateStr}\n`;
+    text += `-----------------------------------\n`;
+    text += `Коммерческий блок:\n\n`;
+    text += `Марка стали: ${steelGrade || "Не выбрана"}${gost ? ` (${gost})` : ""}\n`;
+    text += `Профиль: ${profileType === "round" ? "Круг" : "Шестигранник"} ${selectedTarget || "?"} мм (${profileGost})\n`;
+    text += `Длина: ${lengthLabel} ${orderedLength || "?"} мм\n`;
+    text += `Объем заказа: ${orderWeight || "?"} тонн\n`;
+    text += `Цена на 1 тн продукции без НДС: ${formatCurrency(sellPriceNum)} руб.\n`;
+    text += `Цена на весь заказ без НДС: ${formatCurrency(sellPriceNum * orderWeightNum)} руб.\n\n`;
+
+    text += `-----------------------------------\n`;
+    text += `Производственный блок:\n\n`;
+    text += `Заготовка длина: ${displayedRawLength || "?"} мм\n`;
+    text += `Диаметр заготовки: ${selectedRaw || "?"} мм\n`;
+    text += `Вытяжка (после волочения): ${currentDrawCoef ? currentDrawCoef.toFixed(3) : "?"}\n`;
     text += `Тех. концы: ${techEndsMm || "0.0"} мм (Перед: ${frontCoef}, Зад: ${backCoef})\n`;
     text += `Длина после удаления: ${lengthAfterTechEnds || "0.0"} мм\n`;
+    
+    if (advancedRemnantStats) {
+      text += `Лом количество: ${advancedRemnantStats.orderTechTons ? (advancedRemnantStats.orderTechTons * 1000).toFixed(1) : "0.0"} кг\n`;
+      text += `Деловые остатки: ${advancedRemnantStats.orderRemTons ? (advancedRemnantStats.orderRemTons * 1000).toFixed(1) : "0.0"} кг\n\n`;
+    } else {
+      text += `Лом количество: ? кг\n`;
+      text += `Деловые остатки: ? кг\n\n`;
+    }
+
+    text += `-----------------------------------\n`;
+    text += `Блок снабжение:\n\n`;
     text += `Сырье к закупке: ${requiredWeight || "?"} тонн (Заготовка ${selectedRaw || "?"} мм)\n\n`;
 
-    if (commercialStats && advancedRemnantStats) {
-      text += `Расчет на 1 тонну продукции\n`;
-      text += `Продажная цена (за 1 т): ${formatCurrency(sellPrice)} руб.\n`;
-      text += `- Стоимость заготовки: ${currentAdminRawPrice ? formatCurrency(currentAdminRawPrice) + " руб." : "—"}\n`;
-      text += `- Затраты на отходы (1 т): ${currentAdminRawPrice ? formatCurrency(commercialStats.lossesPerTon) + " руб." : "—"}\n`;
-      if (advancedRemnantStats.techTonsPerTon > 0) {
-        text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.techValuePerTon)} руб.\n`;
-      }
-      if (advancedRemnantStats.remTonsPerTon > 0) {
-        text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.remValuePerTon)} руб.\n`;
-      }
-
-      if (commercialStats.scrapRevenuePerTon > 0) {
-        text += `+ Возврат лома и остатков: ${formatCurrency(commercialStats.scrapRevenuePerTon)} руб.\n`;
-        if (advancedRemnantStats.techScrapRevenuePerTon > 0.01) {
-          text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(adminScrapPrice)} руб/т): ${formatCurrency(
-            advancedRemnantStats.techScrapRevenuePerTon
-          )} руб.\n`;
-        }
-        if (advancedRemnantStats.remnantRevenuePerTon > 0.01) {
-          text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(effectiveRemnantPrice)} руб/т)${
-            currentRemnantPricingRule === "scrap" ? " как лом" : ""
-          }: ${formatCurrency(advancedRemnantStats.remnantRevenuePerTon)} руб.\n`;
-        }
-      }
-      text += `Маржа (1 тн, без НДС): ${commercialStats.isPositive ? "+" : ""}${formatCurrency(commercialStats.profitPerTon)} руб. (${
-        commercialStats.isPositive ? "+" : ""
-      }${commercialStats.marginPercent.toFixed(1)}%)\n\n`;
-
-      text += `Расчет на весь заказ (${orderWeight || 0} т)\n`;
-      text += `Общая сумма продажи: ${formatCurrency(commercialStats.sellTotal)} руб.\n`;
-      text += `- Стоимость заготовки: ${currentAdminRawPrice && orderWeight ? formatCurrency(commercialStats.rawTotal) + " руб." : "—"}\n`;
-      text += `- Затраты на отходы (весь заказ): ${currentAdminRawPrice && orderWeight ? formatCurrency(commercialStats.lossesTotal) + " руб." : "—"}\n`;
-      if (advancedRemnantStats.orderTechTons > 0) {
-        text += `  Лом (${advancedRemnantStats.orderTechTons.toFixed(3)} т): ${formatCurrency(advancedRemnantStats.orderTechValue)} руб.\n`;
-      }
-      if (advancedRemnantStats.orderRemTons > 0) {
-        text += `  Деловой остаток (${advancedRemnantStats.orderRemTons.toFixed(3)} т): ${formatCurrency(advancedRemnantStats.orderRemValue)} руб.\n`;
-      }
-
-      if (commercialStats.scrapRevenueTotal > 0) {
-        text += `+ Возврат лома и остатков: ${formatCurrency(commercialStats.scrapRevenueTotal)} руб.\n`;
-        if (advancedRemnantStats.orderTechRevenue > 0.01) {
-          text += `  Лом (${advancedRemnantStats.orderTechTons.toFixed(3)} т × ${formatCurrency(adminScrapPrice)} руб/т): ${formatCurrency(
-            advancedRemnantStats.orderTechRevenue
-          )} руб.\n`;
-        }
-        if (advancedRemnantStats.orderRemRevenue > 0.01) {
-          text += `  Деловой остаток (${advancedRemnantStats.orderRemTons.toFixed(3)} т × ${formatCurrency(effectiveRemnantPrice)} руб/т)${
-            currentRemnantPricingRule === "scrap" ? " как лом" : ""
-          }: ${formatCurrency(advancedRemnantStats.orderRemRevenue)} руб.\n`;
-        }
-      }
-      text += `Итоговая маржа без НДС: ${commercialStats.isPositive ? "+" : ""}${formatCurrency(commercialStats.profitTotal)} руб.\n`;
-      text += `Сумма заказа (с НДС 22%): ${formatCurrency(commercialStats.sellTotalVat)} руб.\n`;
-    } else if (commercialStats) {
-      text += `Коммерция:\n`;
-      text += `Сумма заказа (без НДС): ${formatCurrency(commercialStats.sellTotal)} руб.\n`;
-      text += `Сумма заказа (с НДС 22%): ${formatCurrency(commercialStats.sellTotalVat)} руб.\n`;
+    text += `-----------------------------------\n`;
+    text += `Блок экономика:\n\n`;
+    text += `Расчет на 1 тонну продукции\n`;
+    text += `Продажная цена (за 1 т): ${formatCurrency(sellPriceNum)} руб.\n`;
+    text += `- Стоимость заготовки: ${formatCurrency(rawPriceNum)} руб.\n`;
+    
+    if (commercialStats && advancedRemnantStats && rawPriceNum > 0) {
+      text += `- Затраты на отходы (1 т): ${formatCurrency(commercialStats.lossesPerTon)} руб.\n`;
+      text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.techValuePerTon)} руб.\n`;
+      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.remValuePerTon)} руб.\n`;
+      
+      text += `+ Возврат лома и остатков: ${formatCurrency(commercialStats.scrapRevenuePerTon)} руб.\n`;
+      text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(scrapPriceNum)} руб/т): ${formatCurrency(advancedRemnantStats.techScrapRevenuePerTon)} руб.\n`;
+      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(remnantPriceNum)} руб/т)${currentRemnantPricingRule === "scrap" ? " как лом" : ""}: ${formatCurrency(advancedRemnantStats.remnantRevenuePerTon)} руб.\n`;
+      
+      const marginPrefix = commercialStats.isPositive ? "+" : "";
+      text += `Маржа (1 тн, без НДС): ${marginPrefix}${formatCurrency(commercialStats.profitPerTon)} руб. (${marginPrefix}${commercialStats.marginPercent.toFixed(1)}%)\n`;
     }
 
     const textArea = document.createElement("textarea");
@@ -473,7 +461,7 @@ export function CalculatorApp({
     <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row">
       <PrintTemplate
         steelGrade={steelGrade}
-        profileType={profileType}
+        profileType={profileType as "round" | "hex"}
         selectedTarget={selectedTarget}
         selectedRaw={selectedRaw}
         orderedLength={orderedLength}
@@ -484,6 +472,7 @@ export function CalculatorApp({
         lengthAfterTechEnds={lengthAfterTechEnds}
         requiredWeight={requiredWeight}
         commercialStats={commercialStats}
+        sellPrice={sellPrice}
       />
 
       {/* Mobile App Bar */}
@@ -590,7 +579,7 @@ export function CalculatorApp({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 sm:gap-6 items-end">
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1 border-b-0">Марка стали</label>
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1 border-b-0">Марка стали {steelGrade && <span className="lowercase font-normal opacity-70">({getGostForGrade(steelGrade)})</span>}</label>
                 <div className="relative">
                   <select
                     value={steelGrade}
@@ -749,7 +738,7 @@ export function CalculatorApp({
               </div>
 
               <div className="space-y-1 w-full col-span-2 sm:col-span-1 2xl:col-span-1">
-                <label className="block text-[10px] font-semibold text-[#0D652D] uppercase ml-1 tracking-wider">Чистая длина</label>
+                <label className="block text-[10px] font-semibold text-[#0D652D] uppercase ml-1 tracking-wider">Полезная длина</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -765,8 +754,8 @@ export function CalculatorApp({
             {/* Ordered lengths */}
             <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-[16px] flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 shadow-sm">
               <div>
-                <label className="block text-base font-medium text-slate-900 tracking-tight">Требуемая длина</label>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">Итоговая отгрузка заказчику</p>
+                <label className="block text-base font-medium text-slate-900 tracking-tight">Длина заказа</label>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">Размер прутка в отгрузке</p>
               </div>
               <div className="relative w-full sm:w-1/3 shrink-0">
                 <input
@@ -865,7 +854,7 @@ export function CalculatorApp({
                   {advancedRemnantStats && (
                     <>
                       <div className="space-y-1.5 sm:border-r border-slate-200 sm:pr-4">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Затраты на отходы (1 тн)</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Стоимость отходов (1 тн)</span>
                         <div className="text-xl font-medium tracking-tight text-slate-900">
                           {currentAdminRawPrice && advancedRemnantStats.valuePerTon !== null ? `${formatCurrency(advancedRemnantStats.valuePerTon)} руб.` : "—"}
                         </div>
@@ -888,7 +877,7 @@ export function CalculatorApp({
                       </div>
 
                       <div className="space-y-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Отходы (заказ)</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Отходы на весь заказ</span>
                         <div className="text-xl font-medium tracking-tight text-slate-900">
                           {currentAdminRawPrice && orderWeight && advancedRemnantStats.orderScrapValue !== null
                             ? `${formatCurrency(advancedRemnantStats.orderScrapValue)} руб.`
@@ -938,7 +927,7 @@ export function CalculatorApp({
                 <div className="p-2 bg-slate-100 border border-slate-200 text-slate-800 rounded-xl">
                   <Package className="w-4 h-4 text-slate-600" />
                 </div>
-                <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Сырье к закупке</h3>
+                <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Вес заготовки</h3>
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-medium text-slate-900 tracking-tight">{requiredWeight || "0.00"}</span>
