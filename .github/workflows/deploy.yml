@@ -33,6 +33,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          # A new commit is required to fix the "Multiple artifacts named github-pages" error caused by re-running failed workflows.
           path: ./dist
 
   deploy:
