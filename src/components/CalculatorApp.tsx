@@ -1,5 +1,5 @@
 import { DEFAULT_STEEL_GRADES, formatCurrency, formatInputValue, getGostForGrade, getLengthLabel, getProfileGost, handleNumericInput, HEX_DATA, ROUND_DATA, TECH_COEFS_ROUND } from "../lib/constants";
-import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, Info, LogOut, Package, Printer, RotateCcw, Ruler, Scale } from "lucide-react";
+import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, Info, LogOut, Package, Printer, RotateCcw, Ruler, Scale, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PrintTemplate } from "./PrintTemplate";
 
@@ -37,6 +37,8 @@ export function CalculatorApp({
   const [sellPrice, setSellPrice] = useState("");
 
   const [isCopied, setIsCopied] = useState(false);
+  const [savedCalculations, setSavedCalculations] = useState<any[]>([]);
+  const [isSaved, setIsSaved] = useState(false);
 
   const activeData = profileType === "round" ? ROUND_DATA : HEX_DATA;
   const allGrades = useMemo(() => [...DEFAULT_STEEL_GRADES, ...(customGrades || [])], [customGrades]);
@@ -375,6 +377,7 @@ export function CalculatorApp({
     setLengthInput({ value: "6000", source: "raw" });
     setOrderedLength("6000");
     setSellPrice("");
+    setSavedCalculations([]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -519,13 +522,19 @@ export function CalculatorApp({
     document.body.removeChild(textArea);
   };
 
+  const handleSave = () => {
+    if (!reportData.formattedGrade || !reportData.selectedTarget || !reportData.orderWeight) return;
+    setSavedCalculations(prev => [...prev, reportData]);
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
+  };
+
   return (
     <>
       <PrintTemplate 
         printText={reportText} 
         reportData={reportData}
-        orderWeight={orderWeight}
-        selectedTarget={selectedTarget}
+        savedCalculations={savedCalculations}
       />
       <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row print:hidden">
 
@@ -582,6 +591,18 @@ export function CalculatorApp({
             </div>
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleSave}
+                className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
+                  isSaved ? "bg-green-100 text-green-800" : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                }`}
+              >
+                {isSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                <span className="hidden sm:inline">{isSaved ? "Сохранено" : "Сохранить"}</span>
+                {savedCalculations.length > 0 && !isSaved && (
+                  <span className="bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center ml-1">{savedCalculations.length}</span>
+                )}
+              </button>
               <button
                 onClick={handleCopy}
                 className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
@@ -1158,7 +1179,7 @@ export function CalculatorApp({
                         Чистые потери от отходов: <span className="font-bold">{formatCurrency(commercialStats.netLossesPerTon)} руб./т</span>.
                       </p>
                       <div className="inline-flex items-center bg-white/60 px-3 py-1.5 rounded-lg text-slate-900 font-bold text-sm border border-slate-200">
-                        Рекомендуемая цена: {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т
+                        Рекомендуемая цена (без НДС): {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т
                       </div>
                     </div>
                   </div>
