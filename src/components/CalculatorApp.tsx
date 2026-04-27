@@ -382,7 +382,7 @@ export function CalculatorApp({
     window.print();
   };
 
-  const handleCopy = () => {
+  const reportText = useMemo(() => {
     const now = new Date();
     const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
     const gost = getGostForGrade(steelGrade);
@@ -394,38 +394,42 @@ export function CalculatorApp({
     const scrapPriceNum = Number(adminScrapPrice) || 0;
     const remnantPriceNum = Number(effectiveRemnantPrice) || 0;
 
-    let text = `Детали расчета (ООО "ЗМК Арсенал") - ${dateStr}\n`;
-    text += `-----------------------------------\n`;
-    text += `Коммерческий блок:\n\n`;
-    text += `Марка стали: ${steelGrade || "Не выбрана"}${gost ? ` (${gost})` : ""}\n`;
-    text += `Профиль: ${profileType === "round" ? "Круг" : "Шестигранник"} ${selectedTarget || "?"} мм (${profileGost})\n`;
-    text += `Длина: ${lengthLabel} ${orderedLength || "?"} мм\n`;
-    text += `Объем заказа: ${orderWeight || "?"} тонн\n`;
-    text += `Цена на 1 тн продукции без НДС: ${formatCurrency(sellPriceNum)} руб.\n`;
-    text += `Цена на весь заказ без НДС: ${formatCurrency(sellPriceNum * orderWeightNum)} руб.\n\n`;
-
-    text += `-----------------------------------\n`;
-    text += `Производственный блок:\n\n`;
-    text += `Заготовка длина: ${displayedRawLength || "?"} мм\n`;
-    text += `Диаметр заготовки: ${selectedRaw || "?"} мм\n`;
-    text += `Вытяжка (после волочения): ${currentDrawCoef ? currentDrawCoef.toFixed(3) : "?"}\n`;
-    text += `Тех. концы: ${techEndsMm || "0.0"} мм (Перед: ${frontCoef}, Зад: ${backCoef})\n`;
-    text += `Длина после удаления: ${lengthAfterTechEnds || "0.0"} мм\n`;
-    
-    if (advancedRemnantStats) {
-      text += `Лом количество: ${advancedRemnantStats.orderTechTons ? (advancedRemnantStats.orderTechTons * 1000).toFixed(1) : "0.0"} кг\n`;
-      text += `Деловые остатки: ${advancedRemnantStats.orderRemTons ? (advancedRemnantStats.orderRemTons * 1000).toFixed(1) : "0.0"} кг\n\n`;
-    } else {
-      text += `Лом количество: ? кг\n`;
-      text += `Деловые остатки: ? кг\n\n`;
+    let formattedGrade = steelGrade;
+    if (steelGrade && !steelGrade.toLowerCase().startsWith('ст') && !steelGrade.toLowerCase().includes('а12')) {
+      formattedGrade = `ст.${steelGrade}`;
     }
 
+    let text = `Детали расчета (ООО "ЗМК Арсенал") - ${dateStr}\n`;
     text += `-----------------------------------\n`;
-    text += `Блок снабжение:\n\n`;
-    text += `Сырье к закупке: ${requiredWeight || "?"} тонн (Заготовка ${selectedRaw || "?"} мм)\n\n`;
-
+    text += `Коммерческий блок:\n`;
+    text += `Марка стали: ${formattedGrade || "Не выбрана"}${gost ? ` (${gost})` : ""}\n`;
+    text += `Профиль: ${profileType === "round" ? "Круг" : "Шестигранник"} ${selectedTarget || "?"} мм (${profileGost})\n`;
+    text += `Длина: ${lengthLabel}\n`;
+    text += `Объем заказа: ${orderWeight || "?"} тонн\n`;
+    text += `Цена за 1 тн продукции без НДС: ${formatCurrency(sellPriceNum)} руб.\n`;
+    text += `Цена за весь заказ без НДС: ${formatCurrency(sellPriceNum * orderWeightNum)} руб.\n`;
     text += `-----------------------------------\n`;
-    text += `Блок экономика:\n\n`;
+    text += `Производственный блок:\n`;
+    text += `Заготовка длина: ${displayedRawLength || "?"} мм\n`;
+    text += `Диаметр заготовки: ${selectedRaw || "?"} мм\n`;
+    text += `Вытяжка после волочения: ${displayedTargetLength || "?"} мм. (коф.- ${currentDrawCoef ? currentDrawCoef.toFixed(3) : "?"})\n`;
+    text += `Тех. концы: ${techEndsMm || "0.0"} мм (Перед: ${frontCoef}, Зад: ${backCoef})\n`;
+    text += `Длина после удаления: = ${lengthAfterTechEnds || "0.0"} мм\n`;
+    
+    if (advancedRemnantStats) {
+      const techTons = advancedRemnantStats.orderTechTons || 0;
+      const remTons = advancedRemnantStats.orderRemTons || 0;
+      text += `Лом количество: ${(techTons * 1000).toFixed(1)} кг. (${techTons.toFixed(3)} тн)\n`;
+      text += `Деловые остатки: ${(remTons * 1000).toFixed(1)} кг. (${remTons.toFixed(3)} тн)\n`;
+    } else {
+      text += `Лом количество: ? кг.\n`;
+      text += `Деловые остатки: ? кг.\n`;
+    }
+    text += `-----------------------------------\n`;
+    text += `Блок снабжение:\n`;
+    text += `Сырье к закупке: Круг г/к ф${selectedRaw || "?"} мм ${formattedGrade || "?"} (${gost || "?"}), количество ${requiredWeight || "?"} тн\n`;
+    text += `-----------------------------------\n`;
+    text += `Блок экономика:\n`;
     text += `Расчет на 1 тонну продукции\n`;
     text += `Продажная цена (за 1 т): ${formatCurrency(sellPriceNum)} руб.\n`;
     text += `- Стоимость заготовки: ${formatCurrency(rawPriceNum)} руб.\n`;
@@ -437,14 +441,22 @@ export function CalculatorApp({
       
       text += `+ Возврат лома и остатков: ${formatCurrency(commercialStats.scrapRevenuePerTon)} руб.\n`;
       text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(scrapPriceNum)} руб/т): ${formatCurrency(advancedRemnantStats.techScrapRevenuePerTon)} руб.\n`;
-      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(remnantPriceNum)} руб/т)${currentRemnantPricingRule === "scrap" ? " как лом" : ""}: ${formatCurrency(advancedRemnantStats.remnantRevenuePerTon)} руб.\n`;
+      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(remnantPriceNum)} руб/т): ${formatCurrency(advancedRemnantStats.remnantRevenuePerTon)} руб.\n`;
       
       const marginPrefix = commercialStats.isPositive ? "+" : "";
       text += `Маржа (1 тн, без НДС): ${marginPrefix}${formatCurrency(commercialStats.profitPerTon)} руб. (${marginPrefix}${commercialStats.marginPercent.toFixed(1)}%)\n`;
     }
+    return text;
+  }, [
+    steelGrade, profileType, orderedLength, currentAdminRawPrice, sellPrice, orderWeight, 
+    adminScrapPrice, effectiveRemnantPrice, selectedTarget, selectedRaw, displayedRawLength, 
+    displayedTargetLength, currentDrawCoef, techEndsMm, frontCoef, backCoef, lengthAfterTechEnds, 
+    requiredWeight, commercialStats, advancedRemnantStats
+  ]);
 
+  const handleCopy = () => {
     const textArea = document.createElement("textarea");
-    textArea.value = text;
+    textArea.value = reportText;
     document.body.appendChild(textArea);
     textArea.select();
     try {
@@ -459,21 +471,7 @@ export function CalculatorApp({
 
   return (
     <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row">
-      <PrintTemplate
-        steelGrade={steelGrade}
-        profileType={profileType as "round" | "hex"}
-        selectedTarget={selectedTarget}
-        selectedRaw={selectedRaw}
-        orderedLength={orderedLength}
-        orderWeight={orderWeight}
-        techEndsMm={techEndsMm}
-        frontCoef={frontCoef}
-        backCoef={backCoef}
-        lengthAfterTechEnds={lengthAfterTechEnds}
-        requiredWeight={requiredWeight}
-        commercialStats={commercialStats}
-        sellPrice={sellPrice}
-      />
+      <PrintTemplate printText={reportText} />
 
       {/* Mobile App Bar */}
       <div className="md:hidden fixed bottom-0 w-full bg-[#F0F4F4]/90 backdrop-blur-md border-t border-slate-200 flex justify-around items-center h-16 z-50 print-hide">
