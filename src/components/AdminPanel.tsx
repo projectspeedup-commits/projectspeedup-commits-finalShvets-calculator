@@ -1,5 +1,5 @@
 import { DEFAULT_STEEL_GRADES, formatInputValue, handleNumericInput } from "../lib/constants";
-import { Cloud, LogOut, Plus, Trash2, Settings } from "lucide-react";
+import { Cloud, LogOut, Plus, Trash2, Settings, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface AdminPanelProps {
@@ -17,6 +17,8 @@ interface AdminPanelProps {
   ) => Promise<void>;
   onLogout: () => void;
   isCloudActive: boolean;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
 }
 
 export function AdminPanel({
@@ -28,6 +30,8 @@ export function AdminPanel({
   onSave,
   onLogout,
   isCloudActive,
+  isDarkMode,
+  toggleTheme,
 }: AdminPanelProps) {
   const [rawPrices, setRawPrices] = useState(initialRawPrices);
   const [scrap, setScrap] = useState(initialScrap);
@@ -108,16 +112,22 @@ export function AdminPanel({
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F4F5F4] dark:bg-[#121411] flex flex-col md:flex-row transition-colors duration-300">
       {/* Mobile App Bar */}
-      <div className="md:hidden fixed bottom-0 w-full bg-[#F0F4F4]/90 backdrop-blur-md border-t border-slate-200 flex justify-around items-center h-16 z-50">
-         <div className="flex flex-col items-center justify-center w-full h-full text-slate-800">
-           <div className="bg-slate-200 px-4 py-1 rounded-full mb-1">
+      <div className="md:hidden fixed bottom-0 w-full bg-[#F0F4F4]/90 dark:bg-[#1A1C19]/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-16 z-50">
+         <div className="flex flex-col items-center justify-center w-full h-full text-slate-800 dark:text-slate-200">
+           <div className="bg-slate-200 dark:bg-slate-700 px-4 py-1 rounded-full mb-1 text-slate-800 dark:text-white">
              <Settings className="w-5 h-5" />
            </div>
            <span className="text-[10px] font-medium tracking-wide">Настройки</span>
          </div>
-         <button onClick={onLogout} className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-slate-800">
+         <button onClick={toggleTheme} className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-slate-800 dark:hover:text-white active:scale-95 transition-all">
+           <div className="px-4 py-1 mb-1 transition-colors">
+             {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
+           </div>
+           <span className="text-[10px] font-medium tracking-wide">{isDarkMode ? 'Светлая' : 'Темная'}</span>
+         </button>
+         <button onClick={onLogout} className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-slate-800 dark:hover:text-white">
            <div className="px-4 py-1 mb-1">
              <LogOut className="w-5 h-5" />
            </div>
@@ -126,22 +136,28 @@ export function AdminPanel({
       </div>
 
       {/* Desktop Navigation Rail */}
-      <div className="hidden md:flex flex-col w-[88px] bg-[#F0F4F4] border-r border-slate-200 items-center py-6 fixed h-full z-50">
+      <div className="hidden md:flex flex-col w-[88px] bg-[#F0F4F4] dark:bg-[#1A1C19] border-r border-slate-200 dark:border-slate-800 items-center py-6 fixed h-full z-50">
         <div className="flex flex-col items-center mb-8">
-           <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center text-white mb-2 shadow-sm">
+           <div className="w-12 h-12 bg-slate-700 dark:bg-slate-600 rounded-xl flex items-center justify-center text-white mb-2 shadow-sm">
              <Cloud className="w-6 h-6" />
            </div>
         </div>
         <div className="flex-1 flex flex-col gap-4 w-full px-3">
-           <div className="w-full flex flex-col items-center justify-center py-4 text-slate-900">
-             <div className="bg-slate-200 px-5 py-1.5 rounded-full mb-1.5">
+           <div className="w-full flex flex-col items-center justify-center py-4 text-slate-900 dark:text-slate-200">
+             <div className="bg-slate-200 dark:bg-slate-700 px-5 py-1.5 rounded-full mb-1.5 text-slate-800 dark:text-white">
                <Settings className="w-6 h-6" strokeWidth={2} />
              </div>
              <span className="text-[11px] font-medium tracking-wide">Настройки</span>
            </div>
+           <button onClick={toggleTheme} className="w-full flex flex-col items-center justify-center py-4 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all active:scale-95 group">
+              <div className="px-5 py-1.5 mb-1.5 transition-colors group-hover:bg-slate-100 dark:group-hover:bg-slate-800 rounded-full">
+                {isDarkMode ? <Sun className="w-6 h-6 text-amber-500" strokeWidth={2} /> : <Moon className="w-6 h-6" strokeWidth={2} />}
+              </div>
+              <span className="text-[11px] font-medium tracking-wide">{isDarkMode ? 'Светлая' : 'Темная'}</span>
+           </button>
         </div>
         <div className="w-full px-3">
-           <button onClick={onLogout} className="w-full flex flex-col items-center justify-center py-4 text-slate-500 hover:text-slate-900 transition-colors">
+           <button onClick={onLogout} className="w-full flex flex-col items-center justify-center py-4 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
              <div className="px-5 py-1.5 mb-1.5">
                <LogOut className="w-6 h-6" strokeWidth={2} />
              </div>
@@ -153,10 +169,10 @@ export function AdminPanel({
       {/* Main Content Area */}
       <div className="flex-1 md:ml-[88px] pb-24 md:pb-8 pt-8 px-4 sm:px-8 max-w-[1200px] mx-auto w-full">
         <div className="mb-8">
-          <h2 className="text-3xl font-normal tracking-tight text-[#1A1C19]">
+          <h2 className="text-3xl font-normal tracking-tight text-[#1A1C19] dark:text-white">
             {isCloudActive ? "Облачные настройки" : "Локальные настройки"}
           </h2>
-          <p className="text-sm text-[#43483F] mt-2">
+          <p className="text-sm text-[#43483F] dark:text-slate-400 mt-2">
             {isCloudActive
               ? "Цены автоматически синхронизируются со всеми менеджерами компании."
               : "Внимание: Облако недоступно. Сохраняется локально."}
@@ -168,16 +184,16 @@ export function AdminPanel({
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
             
             {/* Pricing table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-              <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
-                <h3 className="text-base font-medium text-[#1A1C19]">
+            <div className="bg-white dark:bg-[#1A1C19] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col transition-colors">
+              <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                <h3 className="text-base font-medium text-[#1A1C19] dark:text-white">
                   Цены и политика продажи
                 </h3>
               </div>
               <div className="overflow-x-auto p-0 m-0">
                 <div className="inline-block min-w-full align-middle">
                   <table className="w-full text-left whitespace-nowrap">
-                    <thead className="text-[#43483F] border-b border-slate-200 bg-white">
+                    <thead className="text-[#43483F] dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-transparent">
                       <tr>
                         <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider">Марка стали</th>
                         <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-right">Цена (руб/тн)</th>
@@ -186,14 +202,14 @@ export function AdminPanel({
                         <th className="px-4 py-3 w-12"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {allGrades.map((grade) => {
                         const isCustom = customGrades.includes(grade);
                         const pricing = remnantPricing[grade] || { round: "remnant", hex: "remnant" };
 
                         return (
-                          <tr key={grade} className="bg-white hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-medium text-[#1A1C19] text-sm">
+                          <tr key={grade} className="bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="px-6 py-4 font-medium text-[#1A1C19] dark:text-slate-100 text-sm">
                               {grade}
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -203,38 +219,38 @@ export function AdminPanel({
                                 placeholder="Цена..."
                                 value={formatInputValue(rawPrices[grade] || "")}
                                 onChange={(e) => handlePriceChange(grade, e.target.value)}
-                                className="w-[120px] ml-auto block bg-transparent border-b border-slate-300 focus:border-slate-800 focus:outline-none text-right text-sm font-medium h-9 placeholder:text-slate-400"
+                                className="w-[120px] ml-auto block bg-transparent border-b border-slate-300 dark:border-slate-700 focus:border-slate-800 dark:focus:border-slate-400 focus:outline-none text-right text-sm font-medium h-9 dark:text-white placeholder:text-slate-400"
                               />
                             </td>
                             <td className="px-6 py-4 text-center">
                               <select
                                 value={pricing.round}
                                 onChange={(e) => handlePricingChange(grade, "round", e.target.value)}
-                                className={`bg-[#F0F4F4] text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] mx-auto border-transparent focus:ring-2 focus:ring-slate-300 ${
-                                  pricing.round === "scrap" ? "text-[#BA1A1A] bg-red-50" : "text-[#1A1C19]"
+                                className={`bg-[#F0F4F4] dark:bg-slate-800 text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] mx-auto border-transparent focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 ${
+                                  pricing.round === "scrap" ? "text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20" : "text-[#1A1C19] dark:text-white"
                                 }`}
                               >
-                                <option value="remnant" className="text-[#1A1C19]">Деловой остаток</option>
-                                <option value="scrap" className="text-[#BA1A1A]">По цене лома</option>
+                                <option value="remnant">Деловой остаток</option>
+                                <option value="scrap">По цене лома</option>
                               </select>
                             </td>
                             <td className="px-6 py-4 text-center">
                               <select
                                 value={pricing.hex}
                                 onChange={(e) => handlePricingChange(grade, "hex", e.target.value)}
-                                className={`bg-[#F0F4F4] text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] mx-auto border-transparent focus:ring-2 focus:ring-slate-300 ${
-                                  pricing.hex === "scrap" ? "text-[#BA1A1A] bg-red-50" : "text-[#1A1C19]"
+                                className={`bg-[#F0F4F4] dark:bg-slate-800 text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] mx-auto border-transparent focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 ${
+                                  pricing.hex === "scrap" ? "text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20" : "text-[#1A1C19] dark:text-white"
                                 }`}
                               >
-                                <option value="remnant" className="text-[#1A1C19]">Деловой остаток</option>
-                                <option value="scrap" className="text-[#BA1A1A]">По цене лома</option>
+                                <option value="remnant">Деловой остаток</option>
+                                <option value="scrap">По цене лома</option>
                               </select>
                             </td>
                             <td className="px-4 py-4 text-center align-middle">
                               {isCustom ? (
                                 <button
                                   onClick={() => handleRemoveGrade(grade)}
-                                  className="text-slate-400 hover:text-[#BA1A1A] transition-colors p-2 rounded-full hover:bg-red-50"
+                                  className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
                                   title="Удалить марку"
                                 >
                                   <Trash2 className="w-5 h-5" />
@@ -258,11 +274,11 @@ export function AdminPanel({
           <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
             
             {/* Save actions block */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
-              <h3 className="text-base font-medium text-[#1A1C19]">Сохранение изменений</h3>
+            <div className="bg-white dark:bg-[#1A1C19] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-4">
+              <h3 className="text-base font-medium text-[#1A1C19] dark:text-white">Сохранение изменений</h3>
               
               {saveError && (
-                <div className="text-[#BA1A1A] text-sm font-medium bg-red-50 p-3 rounded-xl">
+                <div className="text-red-500 dark:text-red-400 text-sm font-medium bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
                   {saveError}
                 </div>
               )}
@@ -270,7 +286,7 @@ export function AdminPanel({
                 onClick={handleSave}
                 disabled={isSaving}
                 className={`w-full flex justify-center items-center gap-2 text-white rounded-full h-12 px-6 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  saved ? "bg-green-700 hover:bg-green-800 focus:ring-green-700" : "bg-slate-800 hover:bg-slate-900 focus:ring-slate-800"
+                  saved ? "bg-green-700 dark:bg-green-600 hover:bg-green-800 focus:ring-green-700" : "bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 focus:ring-slate-800"
                 } ${isSaving ? "opacity-70 pointer-events-none" : ""}`}
               >
                 {isSaving ? "Сохранение..." : saved ? "✓ Сохранено" : "Сохранить настройки"}
@@ -278,11 +294,11 @@ export function AdminPanel({
             </div>
 
             {/* Scrap and Remnant */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-6">
-              <h3 className="text-base font-medium text-[#1A1C19]">Базовые цены</h3>
+            <div className="bg-white dark:bg-[#1A1C19] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-6">
+              <h3 className="text-base font-medium text-[#1A1C19] dark:text-white">Базовые цены</h3>
               <div className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#43483F]">Цена лома (руб/тн)</label>
+                  <label className="block text-xs font-medium text-[#43483F] dark:text-slate-400">Цена лома (руб/тн)</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -290,13 +306,13 @@ export function AdminPanel({
                       placeholder="20 000"
                       value={formatInputValue(scrap)}
                       onChange={(e) => handleNumericInput(e, setScrap)}
-                      className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 focus:outline-none focus:ring-0 transition-colors"
+                      className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 dark:focus:border-white focus:outline-none focus:ring-0 transition-colors dark:text-white"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-sm">руб</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium text-sm">руб</span>
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#43483F]">Цена делового остатка (руб/тн)</label>
+                  <label className="block text-xs font-medium text-[#43483F] dark:text-slate-400">Цена делового остатка (руб/тн)</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -304,7 +320,7 @@ export function AdminPanel({
                       placeholder="35 000"
                       value={formatInputValue(remnant)}
                       onChange={(e) => handleNumericInput(e, setRemnant)}
-                      className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 focus:outline-none focus:ring-0 transition-colors"
+                      className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 dark:focus:border-white focus:outline-none focus:ring-0 transition-colors dark:text-white"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-sm">руб</span>
                   </div>
@@ -313,20 +329,20 @@ export function AdminPanel({
             </div>
 
             {/* Add grade */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
-              <h3 className="text-base font-medium text-[#1A1C19]">Новая марка стали</h3>
+            <div className="bg-white dark:bg-[#1A1C19] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-4">
+              <h3 className="text-base font-medium text-[#1A1C19] dark:text-white">Новая марка стали</h3>
               <div className="flex flex-col gap-3">
                 <input
                   type="text"
                   placeholder="Например: ст.50"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
-                  className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg px-4 h-12 text-sm focus:border-slate-800 focus:outline-none focus:ring-0 transition-colors"
+                  className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg px-4 h-12 text-sm focus:border-slate-800 dark:focus:border-white focus:outline-none focus:ring-0 transition-colors dark:text-white"
                 />
                 <button
                   onClick={handleAddGrade}
                   disabled={!newGrade.trim()}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50 disabled:bg-slate-100 flex items-center justify-center gap-2 rounded-full h-11 px-6 text-sm font-medium transition-colors"
+                  className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50 disabled:bg-slate-100 flex items-center justify-center gap-2 rounded-full h-11 px-6 text-sm font-medium transition-colors"
                 >
                   <Plus className="w-5 h-5" />
                   <span>Добавить</span>

@@ -3,18 +3,33 @@
 
 @theme {
   --color-m3-surface: #F8F9FA;
-  --color-m3-surface-2: #F1F3F4;
-  --color-m3-outline: #747775;
+  --color-m3-surface-2: #FFFFFF;
+  --color-m3-surface-container: #F0F4F4;
+  --color-m3-outline: #C3C7CF;
+  --color-m3-text: #1F1F1F;
   --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  .dark {
+    --color-m3-surface: #121411;
+    --color-m3-surface-2: #1A1C19;
+    --color-m3-surface-container: #222421;
+    --color-m3-outline: #43483F;
+    --color-m3-text: #E2E3DE;
+    
+    color-scheme: dark;
+  }
 }
 
 @layer base {
   body {
     background-color: var(--color-m3-surface);
-    color: #1F1F1F;
+    color: var(--color-m3-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 

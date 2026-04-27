@@ -11,6 +11,23 @@ export default function App() {
   const [view, setView] = useState<"login" | "manager" | "admin">("login");
   const [user, setUser] = useState<any>(null);
   const [isCloudActive, setIsCloudActive] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("arsenal_theme");
+      return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      window.localStorage.setItem("arsenal_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      window.localStorage.setItem("arsenal_theme", "light");
+    }
+  }, [isDarkMode]);
 
   // Global prices
   const [globalRawPrices, setGlobalRawPrices] = useState<Record<string, string>>(DEFAULT_RAW_PRICES);
@@ -185,7 +202,15 @@ export default function App() {
   };
 
   if (view === "login") {
-    return <LoginScreen onManagerLogin={() => setView("manager")} onAdminLogin={() => setView("admin")} isCloudActive={isCloudActive} />;
+    return (
+      <LoginScreen 
+        onManagerLogin={() => setView("manager")} 
+        onAdminLogin={() => setView("admin")} 
+        isCloudActive={isCloudActive}
+        isDarkMode={isDarkMode}
+        toggleTheme={() => setIsDarkMode(!isDarkMode)}
+      />
+    );
   }
 
   if (view === "admin") {
@@ -199,6 +224,8 @@ export default function App() {
         onSave={handleSaveGlobal}
         onLogout={() => setView("login")}
         isCloudActive={isCloudActive}
+        isDarkMode={isDarkMode}
+        toggleTheme={() => setIsDarkMode(!isDarkMode)}
       />
     );
   }
@@ -213,6 +240,8 @@ export default function App() {
       onLogout={() => setView("login")}
       isCloudActive={isCloudActive}
       user={user}
+      isDarkMode={isDarkMode}
+      toggleTheme={() => setIsDarkMode(!isDarkMode)}
     />
   );
 }

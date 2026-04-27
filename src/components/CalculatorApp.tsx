@@ -1,9 +1,11 @@
 import { DEFAULT_STEEL_GRADES, formatCurrency, formatInputValue, getGostForGrade, getLengthLabel, getProfileGost, handleNumericInput, HEX_DATA, ROUND_DATA, TECH_COEFS_ROUND } from "../lib/constants";
-import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, History, Info, LogOut, Package, Printer, RotateCcw, Ruler, Save, Scale, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, History, Info, LogOut, Moon, Package, Printer, RotateCcw, Ruler, Save, Scale, Sun, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PrintTemplate } from "./PrintTemplate";
 import { db } from "../lib/firebase";
 import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
+
+import { ConfirmModal } from "./ConfirmModal";
 
 interface CalculatorAppProps {
   adminRawPrices: Record<string, string>;
@@ -14,6 +16,8 @@ interface CalculatorAppProps {
   onLogout: () => void;
   isCloudActive: boolean;
   user: any;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
 }
 
 export function CalculatorApp({
@@ -25,6 +29,8 @@ export function CalculatorApp({
   onLogout,
   isCloudActive,
   user,
+  isDarkMode,
+  toggleTheme,
 }: CalculatorAppProps) {
   const [profileType, setProfileType] = useState<"round" | "hex">("round");
   const [steelGrade, setSteelGrade] = useState("");
@@ -45,6 +51,7 @@ export function CalculatorApp({
   const [isClearing, setIsClearing] = useState(false);
   const [savedCalculations, setSavedCalculations] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
   const activeData = profileType === "round" ? ROUND_DATA : HEX_DATA;
@@ -72,11 +79,19 @@ export function CalculatorApp({
 
   const rawOptions = useMemo(() => {
     if (!selectedTarget) return [];
+    const targetVal = Number(selectedTarget);
     return activeData
-      .filter((item) => item.target === Number(selectedTarget) && item.raw > item.target)
+      .filter((item) => {
+        if (item.target !== targetVal) return false;
+        // Business logic: if target >= 50.5, raw material should be no more than 2mm above target
+        if (profileType === "round" && targetVal >= 50.5) {
+          return item.raw > targetVal && item.raw <= targetVal + 2;
+        }
+        return item.raw > targetVal;
+      })
       .map((item) => item.raw)
       .sort((a, b) => a - b);
-  }, [selectedTarget, activeData]);
+  }, [selectedTarget, activeData, profileType]);
 
   const currentCoefficient = useMemo(() => {
     if (!selectedTarget || !selectedRaw) return null;
@@ -454,37 +469,39 @@ export function CalculatorApp({
       return;
     }
     
-    if (confirm("Вы уверены, что хотите удалить ВСЮ историю расчетов? Это действие необратимо.")) {
-      setIsClearing(true);
-      const q = query(collection(db, "calculations"), where("userId", "==", user.uid));
-      try {
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-          showNotify("История уже пуста");
-          setIsClearing(false);
-          return;
-        }
+    if (savedCalculations.length === 0) {
+      showNotify("История уже пуста");
+      return;
+    }
 
-        const totalDocs = snapshot.docs.length;
-        const BATCH_SIZE = 500;
-        
-        // Split documents into chunks of 500
-        for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
-          const batch = writeBatch(db);
-          const chunk = snapshot.docs.slice(i, i + BATCH_SIZE);
-          chunk.forEach((d) => {
-            batch.delete(d.ref);
-          });
-          await batch.commit();
-        }
-        
-        showNotify("История полностью очищена");
-      } catch (err) {
-        console.error("Error clearing history:", err);
-        showNotify("Ошибка при очистке истории: " + (err instanceof Error ? err.message : String(err)), "error");
-      } finally {
-        setIsClearing(false);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmClearAllHistory = async () => {
+    setShowDeleteConfirm(false);
+    setIsClearing(true);
+    try {
+      const totalDocs = savedCalculations.length;
+      const BATCH_SIZE = 500;
+      let deletedCount = 0;
+      
+      // Split documents into chunks of 500
+      for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = savedCalculations.slice(i, i + BATCH_SIZE);
+        chunk.forEach((calc) => {
+          batch.delete(doc(db, "calculations", calc.id));
+          deletedCount++;
+        });
+        await batch.commit();
       }
+      
+      showNotify(`История успешно очищена (${deletedCount} записей)`);
+    } catch (err) {
+      console.error("Error clearing history:", err);
+      showNotify("Ошибка при очистке истории: " + (err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -655,17 +672,23 @@ export function CalculatorApp({
         orderWeight={orderWeight}
         selectedTarget={selectedTarget}
       />
-      <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row print:hidden">
+      <div className="min-h-screen bg-[#F4F5F4] dark:bg-[#121411] flex flex-col md:flex-row print:hidden transition-colors duration-300">
 
       {/* Mobile App Bar */}
-      <div className="md:hidden fixed bottom-0 w-full bg-[#F0F4F4]/90 backdrop-blur-md border-t border-slate-200 flex justify-around items-center h-16 z-50 print-hide">
-         <div className="flex flex-col items-center justify-center w-full h-full text-slate-800">
-           <div className="bg-slate-200 px-4 py-1 rounded-full mb-1">
+      <div className="md:hidden fixed bottom-0 w-full bg-[#F0F4F4]/90 dark:bg-[#1A1C19]/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-16 z-50 print-hide">
+         <div className="flex flex-col items-center justify-center w-full h-full text-slate-800 dark:text-slate-200">
+           <div className="bg-slate-200 dark:bg-slate-700 px-4 py-1 rounded-full mb-1 text-slate-800 dark:text-white">
              <Calculator className="w-5 h-5" />
            </div>
            <span className="text-[10px] font-medium tracking-wide">Расчет</span>
          </div>
-         <button onClick={onLogout} className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-slate-800">
+         <button onClick={toggleTheme} className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all active:scale-90">
+           <div className="px-4 py-1 mb-1 transition-colors">
+             {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
+           </div>
+           <span className="text-[10px] font-medium tracking-wide">{isDarkMode ? 'Светлая' : 'Темная'}</span>
+         </button>
+         <button onClick={onLogout} className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
            <div className="px-4 py-1 mb-1">
              <LogOut className="w-5 h-5" />
            </div>
@@ -674,22 +697,28 @@ export function CalculatorApp({
       </div>
 
       {/* Desktop Navigation Rail */}
-      <div className="hidden md:flex flex-col w-[88px] bg-[#F0F4F4] border-r border-slate-200 items-center py-6 fixed h-full z-50 print-hide">
+      <div className="hidden md:flex flex-col w-[88px] bg-[#F0F4F4] dark:bg-[#1A1C19] border-r border-slate-200 dark:border-slate-800 items-center py-6 fixed h-full z-50 print-hide">
         <div className="flex flex-col items-center mb-8">
-           <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center text-white mb-2 shadow-sm">
+           <div className="w-12 h-12 bg-slate-700 dark:bg-slate-600 rounded-xl flex items-center justify-center text-white mb-2 shadow-sm">
              <Calculator className="w-6 h-6 outline-none" />
            </div>
         </div>
         <div className="flex-1 flex flex-col gap-4 w-full px-3">
-           <div className="w-full flex flex-col items-center justify-center py-4 text-slate-900">
-             <div className="bg-slate-200 px-5 py-1.5 rounded-full mb-1.5">
+           <div className="w-full flex flex-col items-center justify-center py-4 text-slate-900 dark:text-slate-100">
+             <div className="bg-slate-200 dark:bg-slate-700 px-5 py-1.5 rounded-full mb-1.5 text-slate-800 dark:text-white">
                <Calculator className="w-6 h-6" strokeWidth={2} />
              </div>
              <span className="text-[11px] font-medium tracking-wide">Расчет</span>
            </div>
+           <button onClick={toggleTheme} className="w-full flex flex-col items-center justify-center py-4 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-all active:scale-95 group">
+              <div className="px-5 py-1.5 mb-1.5 transition-colors group-hover:bg-slate-100 dark:group-hover:bg-slate-800 rounded-full">
+                {isDarkMode ? <Sun className="w-6 h-6 text-amber-500" strokeWidth={2} /> : <Moon className="w-6 h-6" strokeWidth={2} />}
+              </div>
+              <span className="text-[11px] font-medium tracking-wide">{isDarkMode ? 'Светлая' : 'Темная'}</span>
+           </button>
         </div>
         <div className="w-full px-3">
-           <button onClick={onLogout} className="w-full flex flex-col items-center justify-center py-4 text-slate-500 hover:text-slate-900 transition-colors">
+           <button onClick={onLogout} className="w-full flex flex-col items-center justify-center py-4 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
              <div className="px-5 py-1.5 mb-1.5">
                <LogOut className="w-6 h-6" strokeWidth={2} />
              </div>
@@ -711,19 +740,21 @@ export function CalculatorApp({
             </div>
           )}
           {/* HEADER */}
-          <header className="sticky top-0 z-40 bg-[#F4F5F4]/90 backdrop-blur-md pt-4 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/50 mb-4 print-hide">
+          <header className="sticky top-0 z-40 bg-[#F4F5F4]/90 dark:bg-[#121411]/90 backdrop-blur-md pt-4 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/50 dark:border-slate-800/50 mb-4 print-hide transition-colors duration-300">
             <div className="flex flex-col">
-              <h1 className="text-xl font-medium tracking-tight text-[#1A1C19]">
+              <h1 className="text-xl font-medium tracking-tight text-[#1A1C19] dark:text-[#E2E3DE]">
                 Калькулятор <span className="hidden sm:inline">для менеджеров</span>
               </h1>
-              <p className="text-[11px] font-medium text-slate-500 tracking-wide">ООО "ЗМК Арсенал"</p>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 tracking-wide">ООО "ЗМК Арсенал"</p>
             </div>
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setShowHistory(!showHistory)}
                 className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
-                    showHistory ? "bg-slate-800 text-white" : "bg-slate-200 hover:bg-slate-300 text-slate-800"
+                    showHistory 
+                      ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900" 
+                      : "bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
                 }`}
                 title="История расчетов"
               >
@@ -733,7 +764,7 @@ export function CalculatorApp({
               <button
                 onClick={handleSave}
                 disabled={isSaving || !steelGrade}
-                className="flex items-center justify-center gap-1.5 px-4 h-9 bg-[#4A6572] hover:bg-[#344955] text-white rounded-md transition-colors font-medium text-xs focus:outline-none disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 px-4 h-9 bg-[#4A6572] dark:bg-[#4A6572] hover:bg-[#344955] text-white rounded-md transition-colors font-medium text-xs focus:outline-none disabled:opacity-50"
               >
                 {isSaving ? (
                   <RotateCcw className="w-4 h-4 animate-spin" />
@@ -745,7 +776,7 @@ export function CalculatorApp({
               <button
                 onClick={handleCopy}
                 className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
-                  isCopied ? "bg-green-100 text-green-800" : "bg-slate-200 hover:bg-slate-300 text-slate-800"
+                  isCopied ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" : "bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
                 }`}
               >
                 {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -753,14 +784,14 @@ export function CalculatorApp({
               </button>
               <button
                 onClick={handlePrint}
-                className="flex items-center justify-center gap-1.5 px-4 h-9 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-md transition-colors font-medium text-xs focus:outline-none"
+                className="flex items-center justify-center gap-1.5 px-4 h-9 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md transition-colors font-medium text-xs focus:outline-none"
               >
                 <Printer className="w-4 h-4" />
                 <span className="sm:hidden">Печать</span>
               </button>
               <button
                 onClick={handleReset}
-                className="flex items-center justify-center w-9 h-9 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-md transition-colors font-medium focus:outline-none"
+                className="flex items-center justify-center w-9 h-9 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md transition-colors font-medium focus:outline-none"
                 title="Сбросить все"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -770,9 +801,9 @@ export function CalculatorApp({
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start pb-8">
             {showHistory && (
-              <div className="lg:col-span-2 bg-white rounded-[16px] border border-slate-200 shadow-md p-5 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center justify-between mb-4 pb-2 border-b">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <div className="lg:col-span-2 bg-white dark:bg-[#1A1C19] rounded-[16px] border border-slate-200 dark:border-slate-800 shadow-md p-5 mb-4 animate-in fade-in slide-in-from-top-2 duration-300 text-slate-800 dark:text-slate-200">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b dark:border-slate-800">
+                   <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                      <History className="w-5 h-5" /> Сохраненные расчеты
                    </h3>
                    <div className="flex items-center gap-4">
@@ -800,7 +831,7 @@ export function CalculatorApp({
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {savedCalculations.map((calc) => (
-                      <div key={calc.id} className="group relative bg-[#F8FAFA] hover:bg-white border border-slate-200 rounded-xl p-3 transition-all hover:shadow-sm">
+                      <div key={calc.id} className="group relative bg-[#F8FAFA] dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 transition-all hover:shadow-sm">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-[10px] text-slate-400 font-medium">
                             {calc.createdAt?.toDate ? calc.createdAt.toDate().toLocaleDateString('ru-RU') : '—'}
@@ -813,9 +844,9 @@ export function CalculatorApp({
                           </button>
                         </div>
                         <div className="cursor-pointer" onClick={() => loadCalculation(calc)}>
-                          <div className="font-semibold text-xs text-slate-800 mb-1">{calc.label}</div>
-                          <div className="text-[11px] text-slate-500">Заготовка: {calc.selectedRaw}мм</div>
-                          <div className="text-[11px] text-slate-500">Объем: {calc.orderWeight}тн</div>
+                          <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 mb-1">{calc.label}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Заготовка: {calc.selectedRaw}мм</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Объем: {calc.orderWeight}тн</div>
                         </div>
                       </div>
                     ))}
@@ -825,13 +856,13 @@ export function CalculatorApp({
             )}
             
             <div className="space-y-4">
-              <section className="bg-white rounded-[16px] border border-slate-200 shadow-sm p-4 sm:p-5 print-shadow-none">
+              <section className="bg-white dark:bg-[#1A1C19] rounded-[16px] border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-5 print-shadow-none transition-colors duration-300">
             {/* Segmented Control */}
-            <div className="bg-slate-100 p-1 rounded-xl flex max-w-[280px] mx-auto mb-6 print-hide">
+            <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex max-w-[280px] mx-auto mb-6 print-hide">
               <button
                 onClick={() => setProfileType("round")}
                 className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200 focus:outline-none ${
-                  profileType === "round" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"
+                  profileType === "round" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"
                 }`}
               >
                 <Circle className="w-3.5 h-3.5" /> Круг
@@ -839,7 +870,7 @@ export function CalculatorApp({
               <button
                 onClick={() => setProfileType("hex")}
                 className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200 focus:outline-none ${
-                  profileType === "hex" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"
+                  profileType === "hex" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"
                 }`}
               >
                 <Hexagon className="w-3.5 h-3.5" /> Шестигранник
@@ -847,57 +878,57 @@ export function CalculatorApp({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 sm:gap-6 items-end">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1 border-b-0">Марка стали {steelGrade && <span className="lowercase font-normal opacity-70">({getGostForGrade(steelGrade)})</span>}</label>
+              <div className="space-y-1.5 text-slate-800 dark:text-white">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 border-b-0">Марка стали {steelGrade && <span className="lowercase font-normal opacity-70">({getGostForGrade(steelGrade)})</span>}</label>
                 <div className="relative">
                   <select
                     value={steelGrade}
                     onChange={(e) => setSteelGrade(e.target.value)}
-                    className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg px-3 h-10 text-sm font-medium appearance-none cursor-pointer focus:border-slate-800 focus:outline-none"
+                    className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg px-3 h-10 text-sm font-medium appearance-none cursor-pointer focus:border-slate-800 dark:focus:border-white focus:outline-none text-slate-900 dark:text-white"
                   >
-                    <option value="" disabled className="text-black">Выберите марку...</option>
+                    <option value="" disabled className="bg-white dark:bg-slate-800 text-black dark:text-white">Выберите марку...</option>
                     {allGrades.map((grade) => (
-                      <option key={grade} value={grade} className="text-black">{grade}</option>
+                      <option key={grade} value={grade} className="bg-white dark:bg-slate-800 text-black dark:text-white">{grade}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1">Готовый пруток</label>
+              <div className="space-y-1.5 text-slate-800 dark:text-white">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Готовый пруток</label>
                 <div className="relative">
                   <select
                     value={selectedTarget}
                     onChange={(e) => setSelectedTarget(e.target.value)}
-                    className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg px-3 h-10 text-sm font-medium appearance-none cursor-pointer focus:border-slate-800 focus:outline-none"
+                    className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg px-3 h-10 text-sm font-medium appearance-none cursor-pointer focus:border-slate-800 dark:focus:border-white focus:outline-none text-slate-900 dark:text-white"
                   >
-                    <option value="" disabled className="text-black">Размер, мм...</option>
+                    <option value="" disabled className="bg-white dark:bg-slate-800 text-black dark:text-white">Размер, мм...</option>
                     {targetOptions.map((size) => (
-                      <option key={size} value={size} className="text-black">{size}</option>
+                      <option key={size} value={size} className="bg-white dark:bg-slate-800 text-black dark:text-white">{size}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1">Заготовка</label>
+              <div className="space-y-1.5 text-slate-800 dark:text-white">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Заготовка</label>
                 <div className="relative">
                   <select
                     value={selectedRaw}
                     onChange={(e) => setSelectedRaw(e.target.value)}
                     disabled={!selectedTarget}
-                    className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg px-3 h-10 text-sm font-medium appearance-none disabled:opacity-50 cursor-pointer focus:border-slate-800 focus:outline-none transition-colors"
+                    className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg px-3 h-10 text-sm font-medium appearance-none disabled:opacity-50 cursor-pointer focus:border-slate-800 dark:focus:border-white focus:outline-none transition-colors text-slate-900 dark:text-white"
                   >
-                    <option value="" disabled className="text-black">{selectedTarget ? "Выбор..." : "Ожидание"}</option>
+                    <option value="" disabled className="bg-white dark:bg-slate-800 text-black dark:text-white">{selectedTarget ? "Выбор..." : "Ожидание"}</option>
                     {rawOptions.map((size) => (
-                      <option key={size} value={size} className="text-black">{size}</option>
+                      <option key={size} value={size} className="bg-white dark:bg-slate-800 text-black dark:text-white">{size}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1">Объем заказа</label>
+              <div className="space-y-1.5 text-slate-800 dark:text-white">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Объем заказа</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -905,41 +936,41 @@ export function CalculatorApp({
                     placeholder="Напр. 5"
                     value={orderWeight}
                     onChange={(e) => handleNumericInput(e, setOrderWeight)}
-                    className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg pl-3 pr-8 h-10 text-sm font-medium outline-none transition-all placeholder:text-slate-400 focus:border-slate-800"
+                    className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg pl-3 pr-8 h-10 text-sm font-medium outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 dark:focus:border-white dark:text-white"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs">тн</span>
                 </div>
               </div>
               
-              <div className="col-span-1 sm:col-span-2 2xl:col-span-4 flex flex-col sm:flex-row gap-2 sm:gap-3 border-t border-slate-200 pt-4 mt-2">
-                <div className="flex-1 flex justify-between items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Цена заготовки</span>
-                  <span className="font-medium text-slate-900 text-sm">{currentAdminRawPrice ? formatInputValue(currentAdminRawPrice) : '—'} <span className="text-slate-500 text-xs ml-1">руб/т</span></span>
+              <div className="col-span-1 sm:col-span-2 2xl:col-span-4 flex flex-col sm:flex-row gap-2 sm:gap-3 border-t border-slate-200 dark:border-slate-800 pt-4 mt-2">
+                <div className="flex-1 flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Цена заготовки</span>
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">{currentAdminRawPrice ? formatInputValue(currentAdminRawPrice) : '—'} <span className="text-slate-500 dark:text-slate-400 text-xs ml-1">руб/т</span></span>
                 </div>
-                <div className="flex-1 flex justify-between items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Цена лома</span>
-                  <span className="font-medium text-slate-900 text-sm">{formatInputValue(adminScrapPrice)} <span className="text-slate-500 text-xs ml-1">руб/т</span></span>
+                <div className="flex-1 flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Цена лома</span>
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">{formatInputValue(adminScrapPrice)} <span className="text-slate-500 dark:text-slate-400 text-xs ml-1">руб/т</span></span>
                 </div>
-                <div className="flex-1 flex justify-between items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Цена остатков</span>
-                  <span className="font-medium text-slate-900 text-sm">{formatInputValue(adminRemnantPrice)} <span className="text-slate-500 text-xs ml-1">руб/т</span></span>
+                <div className="flex-1 flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Цена остатков</span>
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">{formatInputValue(adminRemnantPrice)} <span className="text-slate-500 dark:text-slate-400 text-xs ml-1">руб/т</span></span>
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 print-shadow-none relative overflow-hidden border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-200 pb-3 relative z-10">
-              <div className="p-2 bg-[#4A6572]/10 border border-[#4A6572]/20 text-[#4A6572] rounded-xl print-hide">
+          <section className="bg-white dark:bg-[#1A1C19] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 print-shadow-none relative overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-300">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3 relative z-10">
+              <div className="p-2 bg-[#4A6572]/10 border border-[#4A6572]/20 text-[#4A6572] dark:text-slate-300 rounded-xl print-hide">
                 <Ruler className="w-4 h-4" />
               </div>
-              <h2 className="text-lg font-medium tracking-tight text-[#1A1C19]">Раскрой и остатки</h2>
+              <h2 className="text-lg font-medium tracking-tight text-[#1A1C19] dark:text-white">Раскрой и остатки</h2>
             </div>
 
             {/* Layout lengths */}
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-center bg-white border border-slate-200 p-4 rounded-[16px] relative z-10 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-center bg-white dark:bg-[#222421] border border-slate-200 dark:border-slate-700 p-4 rounded-[16px] relative z-10 shadow-sm">
               <div className="space-y-1.5 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1">Длина заготовки</label>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Длина заготовки</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -947,7 +978,7 @@ export function CalculatorApp({
                     value={displayedRawLength}
                     onChange={(e) => handleNumericInput(e, (val) => setLengthInput({ value: val, source: "raw" }))}
                     disabled={!selectedTarget}
-                    className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg pl-3 pr-10 h-10 text-sm font-medium transition-all disabled:opacity-50 placeholder:text-slate-400 focus:border-slate-800 focus:bg-slate-200 focus:outline-none"
+                    className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg pl-3 pr-10 h-10 text-sm font-medium transition-all disabled:opacity-50 placeholder:text-slate-400 focus:border-slate-800 dark:focus:border-white focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none dark:text-white"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-xs">мм</span>
                 </div>
@@ -956,15 +987,13 @@ export function CalculatorApp({
               <ArrowRight className="w-6 h-6 text-slate-400 hidden md:block shrink-0 mx-2" />
 
               <div className="space-y-1.5 w-full">
-                <label className="block text-[10px] font-semibold text-slate-800 uppercase tracking-wider ml-1">Вытяжка (после волочения)</label>
+                <label className="block text-[10px] font-semibold text-slate-800 dark:text-slate-200 uppercase tracking-wider ml-1">Вытяжка (после волочения)</label>
                 <div className="relative">
                   <input
                     type="text"
-                    inputMode="numeric"
+                    readOnly
                     value={displayedTargetLength}
-                    onChange={(e) => handleNumericInput(e, (val) => setLengthInput({ value: val, source: "target" }))}
-                    disabled={!selectedTarget}
-                    className="w-full bg-[#E8DEF8] border-b border-[#6750A4] text-slate-900 rounded-t-lg pl-3 pr-10 h-10 text-sm font-semibold transition-all disabled:opacity-50 focus:border-[#6750A4] focus:bg-[#E8DEF8]/80 focus:outline-none"
+                    className="w-full bg-[#E8DEF8] dark:bg-[#4A6572]/10 border-b border-[#6750A4] dark:border-[#4A6572] text-slate-900 dark:text-white rounded-t-lg pl-3 pr-10 h-10 text-sm font-semibold transition-all cursor-default focus:outline-none opacity-90"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6750A4] font-medium text-xs">мм</span>
                 </div>
@@ -972,59 +1001,59 @@ export function CalculatorApp({
             </div>
 
             {/* Tech cuts */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 2xl:grid-cols-4 gap-3 items-end bg-white border border-slate-200 p-4 rounded-[16px] relative z-10 shadow-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 2xl:grid-cols-4 gap-3 items-end bg-white dark:bg-[#222421] border border-slate-200 dark:border-slate-700 p-4 rounded-[16px] relative z-10 shadow-sm">
               <div className="space-y-1 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">Обрезь перед</label>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase ml-1 tracking-wider">Обрезь перед</label>
                 <input
                   type="text"
                   readOnly
                   value={formatInputValue(frontCoef)}
-                  className="w-full bg-slate-100 text-slate-500 border border-slate-200 rounded-lg px-3 h-9 text-sm font-medium cursor-default focus:outline-none"
+                  className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg px-3 h-9 text-sm font-medium cursor-default focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">Обрезь зад</label>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase ml-1 tracking-wider">Обрезь зад</label>
                 <input
                   type="text"
                   readOnly
                   value={formatInputValue(backCoef)}
-                  className="w-full bg-slate-100 text-slate-500 border border-slate-200 rounded-lg px-3 h-9 text-sm font-medium cursor-default focus:outline-none"
+                  className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg px-3 h-9 text-sm font-medium cursor-default focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">Тех. концы</label>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase ml-1 tracking-wider">Тех. концы</label>
                 <div className="relative">
                   <input
                     type="text"
                     readOnly
                     value={techEndsMm}
-                    className="w-full bg-slate-100 text-slate-500 border border-slate-200 rounded-lg pl-3 pr-8 h-9 text-sm font-medium cursor-default focus:outline-none"
+                    className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 h-9 text-sm font-medium cursor-default focus:outline-none"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-xs">мм</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-medium text-xs">мм</span>
                 </div>
               </div>
 
               <div className="space-y-1 w-full col-span-2 sm:col-span-1 2xl:col-span-1">
-                <label className="block text-[10px] font-semibold text-[#0D652D] uppercase ml-1 tracking-wider">Полезная длина</label>
+                <label className="block text-[10px] font-semibold text-[#0D652D] dark:text-green-400 uppercase ml-1 tracking-wider">Полезная длина</label>
                 <div className="relative">
                   <input
                     type="text"
                     readOnly
                     value={lengthAfterTechEnds}
-                    className="w-full bg-[#E6F4EA] border border-[#CEEAD6] text-[#0D652D] rounded-lg pl-3 pr-8 h-9 text-sm font-semibold cursor-default focus:outline-none"
+                    className="w-full bg-[#E6F4EA] dark:bg-green-900/10 border border-[#CEEAD6] dark:border-green-900/30 text-[#0D652D] dark:text-green-400 rounded-lg pl-3 pr-8 h-9 text-sm font-semibold cursor-default focus:outline-none"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0D652D]/60 font-medium text-xs">мм</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0D652D]/60 dark:text-green-400/60 font-medium text-xs">мм</span>
                 </div>
               </div>
             </div>
 
             {/* Ordered lengths */}
-            <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-[16px] flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 shadow-sm">
+            <div className="bg-white dark:bg-[#1A1C19] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 rounded-[16px] flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 shadow-sm transition-colors">
               <div>
-                <label className="block text-base font-medium text-slate-900 tracking-tight">Длина заказа</label>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">Размер прутка в отгрузке</p>
+                <label className="block text-base font-medium text-slate-900 dark:text-white tracking-tight">Длина заказа</label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Размер прутка в отгрузке</p>
               </div>
               <div className="relative w-full sm:w-1/3 shrink-0">
                 <input
@@ -1032,7 +1061,7 @@ export function CalculatorApp({
                   inputMode="numeric"
                   value={orderedLength}
                   onChange={(e) => handleNumericInput(e, setOrderedLength)}
-                  className="w-full bg-[#F0F4F4] border-b border-slate-400 text-slate-900 rounded-t-lg px-4 h-12 text-lg font-medium transition-all focus:border-slate-800 focus:bg-slate-200 focus:outline-none"
+                  className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 text-slate-900 dark:text-white rounded-t-lg px-4 h-12 text-lg font-medium transition-all focus:border-slate-800 dark:focus:border-white focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-xs">мм</span>
               </div>
@@ -1040,18 +1069,18 @@ export function CalculatorApp({
 
              {/* Optimal layout recommendation */}
             {optimalLengths.length > 0 && Number(lengthAfterTechEnds) > 0 && (
-              <div className="bg-[#E8DEF8] border border-[#CAC4D0] rounded-[16px] p-4 print-hide relative z-10 shadow-sm">
+              <div className="bg-[#E8DEF8] dark:bg-[#4A6572]/10 border border-[#CAC4D0] dark:border-[#4A6572]/30 rounded-[16px] p-4 print-hide relative z-10 shadow-sm transition-colors">
                 <div className="flex flex-col sm:flex-row items-start gap-4">
-                  <div className="p-2 bg-[#6750A4]/10 rounded-full shrink-0 hidden sm:flex items-center justify-center">
-                    <Info className="w-5 h-5 text-[#1D192B]" />
+                  <div className="p-2 bg-[#6750A4]/10 dark:bg-white/10 rounded-full shrink-0 hidden sm:flex items-center justify-center">
+                    <Info className="w-5 h-5 text-[#1D192B] dark:text-slate-300" />
                   </div>
                   <div className="space-y-4 w-full">
                     <div>
-                      <h3 className="text-sm font-medium text-[#1D192B] flex items-center gap-2">
-                         <Info className="w-4 h-4 text-[#1D192B] sm:hidden" />
+                      <h3 className="text-sm font-medium text-[#1D192B] dark:text-slate-200 flex items-center gap-2">
+                         <Info className="w-4 h-4 text-[#1D192B] dark:text-slate-300 sm:hidden" />
                          Безотходный раскрой 
                       </h3>
-                      <p className="text-[10px] text-[#49454F] mt-1 bg-white/50 px-2 py-1.5 rounded-lg mt-2 inline-block">
+                      <p className="text-[10px] text-[#49454F] dark:text-slate-400 mt-1 bg-white/50 dark:bg-black/20 px-2 py-1.5 rounded-lg mt-2 inline-block">
                         Оптимальная длина = (Чистая длина / Кол-во частей) − 5 мм
                       </p>
                     </div>
@@ -1061,16 +1090,16 @@ export function CalculatorApp({
                         <button
                           key={i}
                           onClick={() => setOrderedLength(opt.length.toString())}
-                          className="bg-white hover:bg-slate-50 border border-[#CAC4D0] text-left p-3 rounded-xl transition-colors group flex items-center justify-between shadow-sm focus:outline-none"
+                          className="bg-white dark:bg-[#1A1C19] hover:bg-slate-50 dark:hover:bg-slate-800 border border-[#CAC4D0] dark:border-slate-700 text-left p-3 rounded-xl transition-colors group flex items-center justify-between shadow-sm focus:outline-none"
                         >
                           <div>
-                            <div className="font-semibold text-[#1D192B] text-sm">{opt.length} мм</div>
-                            <div className="text-[10px] text-[#49454F] font-medium">
+                            <div className="font-semibold text-[#1D192B] dark:text-white text-sm">{opt.length} мм</div>
+                            <div className="text-[10px] text-[#49454F] dark:text-slate-400 font-medium">
                               На {opt.pieces} {opt.pieces === 1 ? "часть" : opt.pieces > 1 && opt.pieces < 5 ? "части" : "частей"}
                             </div>
                           </div>
-                          <div className="w-6 h-6 rounded-full bg-[#6750A4]/5 flex items-center justify-center group-hover:bg-[#6750A4]/10 transition-colors shrink-0">
-                            <ArrowRight className="w-3 h-3 text-[#6750A4]" />
+                          <div className="w-6 h-6 rounded-full bg-[#6750A4]/5 dark:bg-white/5 flex items-center justify-center group-hover:bg-[#6750A4]/10 dark:group-hover:bg-white/10 transition-colors shrink-0">
+                            <ArrowRight className="w-3 h-3 text-[#6750A4] dark:text-slate-400" />
                           </div>
                         </button>
                       ))}
@@ -1082,25 +1111,25 @@ export function CalculatorApp({
 
             {/* Remnant processing */}
             {orderedLength && Number(orderedLength) > 0 && (
-              <div className="bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-[16px] relative z-10 shadow-sm">
+              <div className="bg-slate-50 dark:bg-[#222421] border border-slate-200 dark:border-slate-700 p-4 sm:p-5 rounded-[16px] relative z-10 shadow-sm transition-colors">
                 {remnantLength && Number(remnantLength) > 0 && piecesPerBar > 0 && (
-                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 pb-4 border-b border-slate-200">
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-slate-900 text-[10px] font-bold uppercase tracking-wider">Деловой остаток</h4>
-                        <span className="text-[8px] font-semibold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded uppercase">после реза {piecesPerBar} шт.</span>
+                        <h4 className="text-slate-900 dark:text-slate-200 text-[10px] font-bold uppercase tracking-wider">Деловой остаток</h4>
+                        <span className="text-[8px] font-semibold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded uppercase">после реза {piecesPerBar} шт.</span>
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <p className="text-2xl font-normal text-slate-900 tracking-tight">{remnantLength} <span className="text-base text-slate-500 font-semibold">мм</span></p>
-                        {remnantWeight && <p className="text-slate-500 font-medium text-xs">~ {remnantWeight.tons} т ({remnantWeight.kg} кг)</p>}
+                        <p className="text-2xl font-normal text-slate-900 dark:text-white tracking-tight">{remnantLength} <span className="text-base text-slate-500 dark:text-slate-400 font-semibold">мм</span></p>
+                        {remnantWeight && <p className="text-slate-500 dark:text-slate-400 font-medium text-xs">~ {remnantWeight.tons} т ({remnantWeight.kg} кг)</p>}
                       </div>
                     </div>
                     {remnantValue && effectiveRemnantPrice && (
-                      <div className={`px-4 py-3 rounded-xl w-full lg:w-auto shadow-sm border ${currentRemnantPricingRule === "scrap" ? "bg-[#FFF8E1] border-[#FFECB3]" : "bg-[#E6F4EA] border-[#CEEAD6]"}`}>
-                        <span className={`block text-[8px] font-bold uppercase tracking-wider ${currentRemnantPricingRule === "scrap" ? "text-[#E65100]" : "text-[#0D652D]"}`}>
+                      <div className={`px-4 py-3 rounded-xl w-full lg:w-auto shadow-sm border ${currentRemnantPricingRule === "scrap" ? "bg-[#FFF8E1] dark:bg-amber-900/10 border-[#FFECB3] dark:border-amber-900/30" : "bg-[#E6F4EA] dark:bg-green-900/10 border-[#CEEAD6] dark:border-green-900/30"}`}>
+                        <span className={`block text-[8px] font-bold uppercase tracking-wider ${currentRemnantPricingRule === "scrap" ? "text-[#E65100] dark:text-amber-500" : "text-[#0D652D] dark:text-green-500"}`}>
                           {currentRemnantPricingRule === "scrap" ? "Стоимость лома" : "Оценка остатка"}
                         </span>
-                        <span className={`text-lg font-normal tracking-tight ${currentRemnantPricingRule === "scrap" ? "text-[#E65100]" : "text-[#0D652D]"}`}>
+                        <span className={`text-lg font-normal tracking-tight ${currentRemnantPricingRule === "scrap" ? "text-[#E65100] dark:text-amber-500" : "text-[#0D652D] dark:text-green-500"}`}>
                           {new Intl.NumberFormat("ru-RU").format(remnantValue)} руб.
                         </span>
                       </div>
@@ -1109,12 +1138,12 @@ export function CalculatorApp({
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1.5 sm:border-r border-slate-200 sm:pr-4">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Прутков в 1 тн</span>
-                    <div className="text-xl font-medium text-slate-900">~ {piecesPerTon || 0} шт.</div>
-                    {orderedBarWeight && <div className="text-xs text-slate-500 font-medium">Вес 1 прутка: {orderedBarWeight.kg} кг</div>}
+                  <div className="space-y-1.5 sm:border-r border-slate-200 dark:border-slate-800 sm:pr-4">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Прутков в 1 тн</span>
+                    <div className="text-xl font-medium text-slate-900 dark:text-white">~ {piecesPerTon || 0} шт.</div>
+                    {orderedBarWeight && <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Вес 1 прутка: {orderedBarWeight.kg} кг</div>}
                     {orderWeight && orderedBarWeight ? (
-                      <div className="text-[10px] text-[#006A6A] font-semibold bg-[#006A6A]/10 px-2 py-1 rounded-md mt-2 inline-block">
+                      <div className="text-[10px] text-[#006A6A] dark:text-teal-400 font-semibold bg-[#006A6A]/10 dark:bg-teal-900/20 px-2 py-1 rounded-md mt-2 inline-block">
                         Во всем заказе: ~ {new Intl.NumberFormat("ru-RU").format(totalPiecesInOrder || 0)} шт.
                       </div>
                     ) : null}
@@ -1122,23 +1151,23 @@ export function CalculatorApp({
 
                   {advancedRemnantStats && (
                     <>
-                      <div className="space-y-1.5 sm:border-r border-slate-200 sm:pr-4">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Стоимость отходов (1 тн)</span>
-                        <div className="text-xl font-medium tracking-tight text-slate-900">
+                      <div className="space-y-1.5 sm:border-r border-slate-200 dark:border-slate-800 sm:pr-4">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Стоимость отходов (1 тн)</span>
+                        <div className="text-xl font-medium tracking-tight text-slate-900 dark:text-white">
                           {currentAdminRawPrice && advancedRemnantStats.valuePerTon !== null ? `${formatCurrency(advancedRemnantStats.valuePerTon)} руб.` : "—"}
                         </div>
                         {currentAdminRawPrice && advancedRemnantStats.tonsPerTon !== null && (
-                          <div className="mt-2 space-y-1.5 border-l-2 border-slate-200 pl-3">
+                          <div className="mt-2 space-y-1.5 border-l-2 border-slate-200 dark:border-slate-800 pl-3">
                             {advancedRemnantStats.techTonsPerTon > 0 && (
-                              <div className="text-[10px] text-slate-500 flex justify-between font-medium">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between font-medium">
                                 <span>Лом:</span>
-                                <span className="font-semibold text-slate-900">{formatCurrency(advancedRemnantStats.techValuePerTon)} руб.</span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-200">{formatCurrency(advancedRemnantStats.techValuePerTon)} руб.</span>
                               </div>
                             )}
                             {advancedRemnantStats.remTonsPerTon > 0 && (
-                              <div className="text-[10px] text-slate-500 flex justify-between font-medium">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between font-medium">
                                 <span>Остаток:</span>
-                                <span className="font-semibold text-slate-900">{formatCurrency(advancedRemnantStats.remValuePerTon)} руб.</span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-200">{formatCurrency(advancedRemnantStats.remValuePerTon)} руб.</span>
                               </div>
                             )}
                           </div>
@@ -1146,24 +1175,24 @@ export function CalculatorApp({
                       </div>
 
                       <div className="space-y-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Отходы на весь заказ</span>
-                        <div className="text-xl font-medium tracking-tight text-slate-900">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Отходы на весь заказ</span>
+                        <div className="text-xl font-medium tracking-tight text-slate-900 dark:text-white">
                           {currentAdminRawPrice && orderWeight && advancedRemnantStats.orderScrapValue !== null
                             ? `${formatCurrency(advancedRemnantStats.orderScrapValue)} руб.`
                             : "—"}
                         </div>
                         {currentAdminRawPrice && orderWeight && advancedRemnantStats.orderScrapTons !== null && (
-                          <div className="mt-2 space-y-1.5 border-l-2 border-slate-200 pl-3">
+                          <div className="mt-2 space-y-1.5 border-l-2 border-slate-200 dark:border-slate-800 pl-3">
                             {advancedRemnantStats.orderTechTons > 0 && (
-                              <div className="text-[10px] text-slate-500 flex justify-between font-medium">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between font-medium">
                                 <span>Лом:</span>
-                                <span className="font-semibold text-slate-900">{formatCurrency(advancedRemnantStats.orderTechValue)} руб.</span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-200">{formatCurrency(advancedRemnantStats.orderTechValue)} руб.</span>
                               </div>
                             )}
                             {advancedRemnantStats.orderRemTons > 0 && (
-                              <div className="text-[10px] text-slate-500 flex justify-between font-medium">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between font-medium">
                                 <span>Остаток:</span>
-                                <span className="font-semibold text-slate-900">{formatCurrency(advancedRemnantStats.orderRemValue)} руб.</span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-200">{formatCurrency(advancedRemnantStats.orderRemValue)} руб.</span>
                               </div>
                             )}
                           </div>
@@ -1191,44 +1220,44 @@ export function CalculatorApp({
 
         <div className="space-y-4">
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative">
-            <div className="bg-white p-4 sm:p-5 flex flex-col justify-center relative z-10 border border-slate-200 rounded-[16px] shadow-sm">
+            <div className="bg-white dark:bg-[#1A1C19] p-4 sm:p-5 flex flex-col justify-center relative z-10 border border-slate-200 dark:border-slate-800 rounded-[16px] shadow-sm transition-colors overflow-hidden">
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-slate-100 border border-slate-200 text-slate-800 rounded-xl">
-                  <Package className="w-4 h-4 text-slate-600" />
+                <div className="p-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl">
+                  <Package className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                 </div>
-                <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Вес заготовки</h3>
+                <h3 className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Вес заготовки</h3>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-medium text-slate-900 tracking-tight">{requiredWeight || "0.00"}</span>
-                <span className="text-base font-medium text-slate-500">тонн</span>
+                <span className="text-3xl font-medium text-slate-900 dark:text-white tracking-tight">{requiredWeight || "0.00"}</span>
+                <span className="text-base font-medium text-slate-500 dark:text-slate-400">тонн</span>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 flex flex-col justify-center relative z-10 border border-slate-200 rounded-[16px] shadow-sm">
+            <div className="bg-white dark:bg-[#1A1C19] p-4 sm:p-5 flex flex-col justify-center relative z-10 border border-slate-200 dark:border-slate-800 rounded-[16px] shadow-sm transition-colors overflow-hidden">
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-slate-100 border border-slate-200 text-slate-800 rounded-xl">
-                  <Scale className="w-4 h-4 text-slate-600" />
+                <div className="p-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl">
+                  <Scale className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                 </div>
-                <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Расходный коэффициент общий</h3>
+                <h3 className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Расходный коэффициент общий</h3>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-medium text-slate-900 tracking-tight">{currentCoefficient ? currentCoefficient.toFixed(3) : "—"}</span>
+                <span className="text-3xl font-medium text-slate-900 dark:text-white tracking-tight">{currentCoefficient ? currentCoefficient.toFixed(3) : "—"}</span>
               </div>
             </div>
           </section>
 
           {/* COMMERCIAL COMMERCE SECTION */}
-          <section className="bg-white rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 print-shadow-none relative overflow-hidden z-10 border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-200 pb-3 relative z-10">
-              <div className="p-2 bg-slate-800 text-white rounded-xl shadow-sm">
+          <section className="bg-white dark:bg-[#1A1C19] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 print-shadow-none relative overflow-hidden z-10 border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3 relative z-10">
+              <div className="p-2 bg-slate-800 dark:bg-slate-700 text-white rounded-xl shadow-sm">
                 <Briefcase className="w-4 h-4" />
               </div>
-              <h2 className="text-lg font-medium tracking-tight text-[#1A1C19]">Коммерческий расчет</h2>
+              <h2 className="text-lg font-medium tracking-tight text-[#1A1C19] dark:text-white">Коммерческий расчет</h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 p-4 rounded-[16px] relative z-10 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-[#222421] border border-slate-200 dark:border-slate-700 p-4 rounded-[16px] relative z-10 shadow-sm transition-colors">
               <div className="space-y-1.5 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1 truncate">Продажа за 1 т (без НДС)</label>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 truncate">Продажа за 1 т (без НДС)</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -1236,54 +1265,54 @@ export function CalculatorApp({
                     placeholder="55 000"
                     value={formatInputValue(sellPrice)}
                     onChange={(e) => handleNumericInput(e, setSellPrice)}
-                    className="w-full bg-[#F0F4F4] border-b border-slate-400 rounded-t-lg pl-3 pr-10 h-10 text-sm font-medium transition-all focus:border-slate-800 focus:bg-slate-200 focus:outline-none"
+                    className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg pl-3 pr-10 h-10 text-sm font-medium transition-all focus:border-slate-800 dark:focus:border-white focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none dark:text-white placeholder:text-slate-400"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-xs">руб</span>
                 </div>
               </div>
 
               <div className="space-y-1.5 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1 truncate">Сумма заказа (без НДС)</label>
-                <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 h-10 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-900 truncate pl-1">{sellPrice && orderWeight ? formatCurrency(commercialStats?.sellTotal) : "0,00"}</span>
-                  <span className="text-slate-500 font-medium ml-1 text-xs">руб</span>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 truncate">Сумма заказа (без НДС)</label>
+                <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 h-10 flex items-center justify-between transition-colors">
+                  <span className="text-sm font-medium text-slate-900 dark:text-white truncate pl-1">{sellPrice && orderWeight ? formatCurrency(commercialStats?.sellTotal) : "0,00"}</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium ml-1 text-xs">руб</span>
                 </div>
               </div>
 
               <div className="space-y-1.5 w-full">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider ml-1 truncate">Сумма (с НДС 22%)</label>
-                <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 h-10 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-900 truncate pl-1">{sellPrice && orderWeight ? formatCurrency(commercialStats?.sellTotalVat) : "0,00"}</span>
-                  <span className="text-slate-500 font-medium ml-1 text-xs">руб</span>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 truncate">Сумма (с НДС 22%)</label>
+                <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 h-10 flex items-center justify-between transition-colors">
+                  <span className="text-sm font-medium text-slate-900 dark:text-white truncate pl-1">{sellPrice && orderWeight ? formatCurrency(commercialStats?.sellTotalVat) : "0,00"}</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium ml-1 text-xs">руб</span>
                 </div>
               </div>
             </div>
 
             {commercialStats && (
-              <div className="bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-[16px] space-y-6 mt-4 relative z-10 shadow-sm">
+              <div className="bg-slate-50 dark:bg-[#222421] border border-slate-200 dark:border-slate-700 p-4 sm:p-5 rounded-[16px] space-y-6 mt-4 relative z-10 shadow-sm transition-colors">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 lg:gap-12 pl-1">
                   <div className="space-y-4">
-                    <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-200 pb-2">На 1 тонну продукции</h4>
+                    <h4 className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800 pb-2">На 1 тонну продукции</h4>
                     <div className="space-y-2.5 text-xs">
                       <div className="flex justify-between items-center font-medium">
-                        <span className="text-slate-600">Продажная цена:</span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(sellPrice)} руб.</span>
+                        <span className="text-slate-600 dark:text-slate-400">Продажная цена:</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(sellPrice)} руб.</span>
                       </div>
-                      <div className="flex justify-between items-center text-[#BA1A1A] font-medium">
+                      <div className="flex justify-between items-center text-[#BA1A1A] dark:text-red-400 font-medium">
                         <span>- Стоимость заготовки:</span>
                         <span>{currentAdminRawPrice ? `${formatCurrency(currentAdminRawPrice)} руб.` : "—"}</span>
                       </div>
-                      <div className="flex justify-between items-center text-[#BA1A1A] font-medium">
+                      <div className="flex justify-between items-center text-[#BA1A1A] dark:text-red-400 font-medium">
                         <span>- Затраты на отходы:</span>
                         <span>{currentAdminRawPrice ? `${formatCurrency(commercialStats.lossesPerTon)} руб.` : "—"}</span>
                       </div>
                       {commercialStats.scrapRevenuePerTon > 0 && (
                         <div className="flex flex-col gap-1">
-                          <div className="flex justify-between items-center text-[#0D652D] font-medium bg-[#E6F4EA] border border-[#CEEAD6] px-2.5 py-1.5 rounded-lg shadow-sm">
+                          <div className="flex justify-between items-center text-[#0D652D] dark:text-green-400 font-medium bg-[#E6F4EA] dark:bg-green-900/10 border border-[#CEEAD6] dark:border-green-900/30 px-2.5 py-1.5 rounded-lg shadow-sm transition-colors">
                             <span>+ Возврат лома/остатков:</span>
                             <span>{formatCurrency(commercialStats.scrapRevenuePerTon)} руб.</span>
                           </div>
-                          <div className="space-y-1 pl-3 border-l-2 border-[#CEEAD6] mt-1 text-[#0D652D]">
+                          <div className="space-y-1 pl-3 border-l-2 border-[#CEEAD6] dark:border-green-900/30 mt-1 text-[#0D652D] dark:text-green-400">
                             {advancedRemnantStats && advancedRemnantStats.techScrapRevenuePerTon > 0 && (
                               <div className="flex justify-between items-center text-[10px] font-medium">
                                 <span>Лом ({(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг):</span>
@@ -1299,13 +1328,13 @@ export function CalculatorApp({
                           </div>
                         </div>
                       )}
-                      <div className="pt-4 border-t border-slate-200 flex flex-col gap-1.5">
-                        <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Маржа (без НДС):</span>
+                      <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-1.5">
+                        <span className="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Маржа (без НДС):</span>
                         <div className="flex items-center gap-2">
-                          <span className={`font-medium tracking-tight text-xl ${commercialStats.isPositive ? "text-[#0D652D]" : "text-[#BA1A1A]"}`}>
+                          <span className={`font-medium tracking-tight text-xl ${commercialStats.isPositive ? "text-[#0D652D] dark:text-green-400" : "text-[#BA1A1A] dark:text-red-400"}`}>
                             {commercialStats.isPositive ? "+" : ""}{formatCurrency(commercialStats.profitPerTon)} руб.
                           </span>
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border shadow-sm ${commercialStats.isPositive ? "bg-[#E6F4EA] border-[#CEEAD6] text-[#0D652D]" : "bg-[#FFDAD6] border-[#FFB4AB] text-[#BA1A1A]"}`}>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border shadow-sm ${commercialStats.isPositive ? "bg-[#E6F4EA] dark:bg-green-900/20 border-[#CEEAD6] dark:border-green-900/40 text-[#0D652D] dark:text-green-400" : "bg-[#FFDAD6] dark:bg-red-900/20 border-[#FFB4AB] dark:border-red-900/40 text-[#BA1A1A] dark:text-red-400"}`}>
                             {commercialStats.isPositive ? "+" : ""}{commercialStats.marginPercent.toFixed(1)}%
                           </span>
                         </div>
@@ -1314,27 +1343,27 @@ export function CalculatorApp({
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-200 pb-2">На весь заказ ({totalPiecesInOrder} шт.)</h4>
+                    <h4 className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800 pb-2">На весь заказ ({totalPiecesInOrder} шт.)</h4>
                     <div className="space-y-2.5 text-xs">
                       <div className="flex justify-between items-center font-medium">
-                        <span className="text-slate-600">Сумма продажи:</span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(commercialStats.sellTotal)} руб.</span>
+                        <span className="text-slate-600 dark:text-slate-400">Сумма продажи:</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(commercialStats.sellTotal)} руб.</span>
                       </div>
-                      <div className="flex justify-between items-center text-[#BA1A1A] font-medium">
+                      <div className="flex justify-between items-center text-[#BA1A1A] dark:text-red-400 font-medium">
                         <span>- Стоимость заготовки:</span>
                         <span>{currentAdminRawPrice && orderWeight ? `${formatCurrency(commercialStats.rawTotal)} руб.` : "—"}</span>
                       </div>
-                      <div className="flex justify-between items-center text-[#BA1A1A] font-medium">
+                      <div className="flex justify-between items-center text-[#BA1A1A] dark:text-red-400 font-medium">
                         <span>- Затраты на отходы:</span>
                         <span>{currentAdminRawPrice && orderWeight ? `${formatCurrency(commercialStats.lossesTotal)} руб.` : "—"}</span>
                       </div>
                       {commercialStats.scrapRevenueTotal > 0 && (
                         <div className="flex flex-col gap-1">
-                          <div className="flex justify-between items-center text-[#0D652D] font-medium bg-[#E6F4EA] border border-[#CEEAD6] px-2.5 py-1.5 rounded-lg shadow-sm">
+                          <div className="flex justify-between items-center text-[#0D652D] dark:text-green-400 font-medium bg-[#E6F4EA] dark:bg-green-900/10 border border-[#CEEAD6] dark:border-green-900/30 px-2.5 py-1.5 rounded-lg shadow-sm transition-colors">
                             <span>+ Возврат лома/остатков:</span>
                             <span>{formatCurrency(commercialStats.scrapRevenueTotal)} руб.</span>
                           </div>
-                          <div className="space-y-1 pl-3 border-l-2 border-[#CEEAD6] mt-1 text-[#0D652D]">
+                          <div className="space-y-1 pl-3 border-l-2 border-[#CEEAD6] dark:border-green-900/30 mt-1 text-[#0D652D] dark:text-green-400">
                             {advancedRemnantStats && advancedRemnantStats.orderTechRevenue > 0 && (
                               <div className="flex justify-between items-center text-[10px] font-medium">
                                 <span>Лом ({advancedRemnantStats.orderTechTons.toFixed(3)} т):</span>
@@ -1350,9 +1379,9 @@ export function CalculatorApp({
                           </div>
                         </div>
                       )}
-                      <div className="pt-4 border-t border-slate-200 flex flex-col gap-1.5">
-                        <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Итого маржа (без НДС):</span>
-                        <span className={`font-medium tracking-tight text-2xl ${commercialStats.isPositive ? "text-[#0D652D]" : "text-[#BA1A1A]"}`}>
+                      <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-1.5">
+                        <span className="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Итого маржа (без НДС):</span>
+                        <span className={`font-medium tracking-tight text-2xl ${commercialStats.isPositive ? "text-[#0D652D] dark:text-green-400" : "text-[#BA1A1A] dark:text-red-400"}`}>
                           {commercialStats.isPositive ? "+" : ""}{formatCurrency(commercialStats.profitTotal)} руб.
                         </span>
                       </div>
@@ -1363,36 +1392,36 @@ export function CalculatorApp({
             )}
             
             {commercialStats && (
-              <div className="grid grid-cols-1 gap-3 pt-4 relative z-10">
+              <div className="grid grid-cols-1 gap-3 pt-4 relative z-10 font-sans tracking-tight">
                 {commercialStats.netLossesPerTon > 0 && (
-                  <div className="bg-[#FFF8E1] border border-[#FFECB3] p-4 rounded-xl flex gap-3 shadow-sm">
-                    <Info className="w-5 h-5 text-[#E65100] shrink-0" />
+                  <div className="bg-[#FFF8E1] dark:bg-amber-900/10 border border-[#FFECB3] dark:border-amber-900/30 p-4 rounded-xl flex gap-3 shadow-sm transition-colors">
+                    <Info className="w-5 h-5 text-[#E65100] dark:text-amber-500 shrink-0" />
                     <div>
-                      <h5 className="font-semibold text-[#E65100] text-sm mb-1">Рекомендация по цене</h5>
-                      <p className="text-[#E65100]/80 text-[11px] font-medium mb-2">
+                      <h5 className="font-semibold text-[#E65100] dark:text-amber-500 text-sm mb-1">Рекомендация по цене</h5>
+                      <p className="text-[#E65100]/80 dark:text-amber-500/80 text-[11px] font-medium mb-2">
                         Чистые потери от отходов: <span className="font-bold">{formatCurrency(commercialStats.netLossesPerTon)} руб./т</span>.
                       </p>
-                      <div className="inline-flex items-center bg-white/60 px-3 py-1.5 rounded-lg text-slate-900 font-bold text-sm border border-slate-200">
+                      <div className="inline-flex items-center bg-white/60 dark:bg-white/10 px-3 py-1.5 rounded-lg text-slate-900 dark:text-white font-bold text-sm border border-slate-200 dark:border-white/10 shadow-sm">
                         Рекомендуемая цена: {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т
                       </div>
                     </div>
                   </div>
                 )}
                 {commercialStats.profitPerTon > 0 && commercialStats.profitPerTon < 10000 && (
-                  <div className="border border-[#FFECB3] p-4 rounded-xl flex gap-3 shadow-sm bg-white">
-                    <AlertTriangle className="w-5 h-5 text-[#E65100] shrink-0" />
+                  <div className="border border-[#FFECB3] dark:border-amber-900/30 p-4 rounded-xl flex gap-3 shadow-sm bg-white dark:bg-[#1A1C19] transition-colors">
+                    <AlertTriangle className="w-5 h-5 text-[#E65100] dark:text-amber-500 shrink-0" />
                     <div>
-                      <h5 className="font-semibold text-[#E65100] text-sm mb-1">Осторожно</h5>
-                      <p className="text-slate-500 text-xs font-medium">Маржинальность на тонну меньше 10 000 руб. ({formatCurrency(commercialStats.profitPerTon)} руб./т).</p>
+                      <h5 className="font-semibold text-[#E65100] dark:text-amber-500 text-sm mb-1">Осторожно</h5>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs font-medium">Маржинальность на тонну меньше 10 000 руб. ({formatCurrency(commercialStats.profitPerTon)} руб./т).</p>
                     </div>
                   </div>
                 )}
                 {commercialStats.profitPerTon <= 0 && currentAdminRawPrice && sellPrice && (
-                  <div className="bg-[#FFDAD6] border border-[#FFB4AB] p-4 rounded-xl flex gap-3 shadow-sm">
-                    <AlertTriangle className="w-5 h-5 text-[#BA1A1A] shrink-0" />
+                  <div className="bg-[#FFDAD6] dark:bg-red-900/20 border border-[#FFB4AB] dark:border-red-900/40 p-4 rounded-xl flex gap-3 shadow-sm transition-colors">
+                    <AlertTriangle className="w-5 h-5 text-[#BA1A1A] dark:text-red-400 shrink-0" />
                     <div>
-                      <h5 className="font-semibold text-[#BA1A1A] text-sm mb-1">Сделка убыточна</h5>
-                      <p className="text-[#BA1A1A]/80 text-xs font-medium">Пересмотрите цену продажи или согласуйте новую длину.</p>
+                      <h5 className="font-semibold text-[#BA1A1A] dark:text-red-400 text-sm mb-1">Сделка убыточна</h5>
+                      <p className="text-[#BA1A1A]/80 dark:text-red-400/80 text-xs font-medium">Пересмотрите цену продажи или согласуйте новую длину.</p>
                     </div>
                   </div>
                 )}
@@ -1404,6 +1433,15 @@ export function CalculatorApp({
     </div>
   </div>
 </div>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmClearAllHistory}
+        title="Подтвердите действие"
+        message={`Вы действительно хотите удалить историю расчетов (${savedCalculations.length} записей)? Это действие необратимо.`}
+        confirmText="Удалить все"
+        cancelText="Отмена"
+      />
     </>
   );
 }
