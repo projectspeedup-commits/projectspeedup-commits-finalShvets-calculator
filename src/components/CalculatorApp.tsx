@@ -458,6 +458,12 @@ export function CalculatorApp({
     text += `Цена за 1 тн продукции без НДС: ${formatCurrency(sellPriceNum)} руб.\n`;
     text += `Цена за весь заказ без НДС: ${formatCurrency(sellTotal)} руб.\n`;
     text += `Цена за весь заказ с НДС (22%): ${formatCurrency(sellTotal * 1.22)} руб.\n`;
+    
+    if (commercialStats) {
+      const marginPrefix = commercialStats.isPositive ? "+" : "";
+      text += `Маржа (1 тн, без НДС): ${marginPrefix}${formatCurrency(commercialStats.profitPerTon)} руб. (${marginPrefix}${commercialStats.marginPercent.toFixed(1)}%)\n`;
+    }
+    
     text += `-----------------------------------\n`;
     text += `Производственный блок:\n`;
     text += `Заготовка длина: ${displayedRawLength || "?"} мм\n`;

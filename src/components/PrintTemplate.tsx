@@ -76,6 +76,15 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
                 <td className="border border-black p-1.5 font-bold bg-gray-50">Итого с НДС (22%):</td>
                 <td className="border border-black p-1.5 font-bold">{formatCurrency(sellTotal * 1.22)} руб.</td>
               </tr>
+              {commercialStats && (
+                <tr>
+                  <td className="border border-black p-1.5 font-bold bg-gray-50" colSpan={2}></td>
+                  <td className="border border-black p-1.5 font-bold bg-gray-50 uppercase text-[10px]">Маржа (1 тн, без НДС):</td>
+                  <td className="border border-black p-1.5 font-bold">
+                    {commercialStats.isPositive ? "+" : ""}{formatCurrency(commercialStats.profitPerTon)} руб. ({commercialStats.isPositive ? "+" : ""}{commercialStats.marginPercent.toFixed(1)}%)
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </section>
