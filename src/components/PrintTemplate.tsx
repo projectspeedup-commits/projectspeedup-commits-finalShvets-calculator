@@ -3,70 +3,204 @@ import { formatCurrency } from "../lib/constants";
 interface PrintTemplateProps {
   printText: string;
   reportData: any;
-  savedCalculations?: any[];
+  orderWeight: string;
+  selectedTarget: string;
 }
 
-export function PrintTemplate({ reportData, savedCalculations = [] }: PrintTemplateProps) {
-  const itemsToPrint = savedCalculations.length > 0 ? savedCalculations : [reportData];
+export function PrintTemplate({ reportData, orderWeight, selectedTarget }: PrintTemplateProps) {
+  const {
+    dateStr,
+    formattedGrade,
+    gost,
+    profileTypeStr,
+    profileGost,
+    lengthLabel,
+    orderedLength,
+    remnantLength,
+    rawPriceNum,
+    sellPriceNum,
+    sellTotal,
+    displayedRawLength,
+    selectedRaw,
+    displayedTargetLength,
+    currentDrawCoef,
+    techEndsMm,
+    lengthAfterTechEnds,
+    techTons,
+    remTons,
+    requiredWeight,
+    commercialStats,
+    advancedRemnantStats,
+  } = reportData;
+
+  const totalTechKg = (techTons * 1000).toFixed(1);
+  const totalRemKg = (remTons * 1000).toFixed(1);
 
   return (
-    <div className="hidden print:block bg-white w-full max-w-[210mm] mx-auto text-black font-sans text-[14px] leading-[1.6]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+    <div className="hidden print:block bg-white w-full max-w-[210mm] mx-auto text-black font-serif text-[12px] leading-tight" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
       
-      <div className="px-8 py-8 space-y-12">
-        
-        {itemsToPrint.map((data, index) => {
-          const {
-            dateStr,
-            formattedGrade,
-            gost,
-            profileTypeStr,
-            profileGost,
-            orderedLength,
-            sellPriceNum,
-            sellTotal,
-            commercialStats,
-            orderWeightNum
-          } = data;
-          
-          const orderWeightStr = data.orderWeight || data.requiredWeight || (orderWeightNum ? orderWeightNum.toString() : "?");
-          const marginPrefix = commercialStats?.isPositive ? "+" : "";
+      {/* HEADER */}
+      <div className="text-center mb-6 pt-4">
+        <h1 className="text-lg font-bold uppercase tracking-tight">ООО «ЗМК АРСЕНАЛ»</h1>
+        <p className="text-sm font-bold mt-1">Коммерческий расчет от {dateStr}</p>
+        <p className="text-[11px] mt-1 italic text-gray-700">Внутренний документ расчета рентабельности</p>
+      </div>
 
-          return (
-            <div key={index} className="border-b border-gray-300 pb-8 mb-8 last:border-0 last:mb-0 last:pb-0">
-              <h2 className="font-bold text-[16px] mb-3">Расчет (ООО «ЗМК Арсенал») - {dateStr}</h2>
-              <div className="space-y-1.5">
-                <div><span className="font-semibold">Марка стали:</span> {formattedGrade || "Не выбрана"} {gost ? `(${gost})` : ""}</div>
-                <div><span className="font-semibold">Профиль:</span> {profileTypeStr} {data.selectedTarget || "?"} мм ({profileGost})</div>
-                <div><span className="font-semibold">Длина:</span> {orderedLength || "?"} мм</div>
-                <div><span className="font-semibold">Объем заказа:</span> {orderWeightStr} тонна</div>
-                <div><span className="font-semibold">Цена за 1 тн продукции без НДС:</span> {formatCurrency(sellPriceNum)} руб.</div>
-                <div><span className="font-semibold">Цена за весь заказ без НДС:</span> {formatCurrency(sellTotal)} руб.</div>
-                <div><span className="font-semibold">Цена за весь заказ с НДС (22%):</span> {formatCurrency(sellTotal * 1.22)} руб.</div>
-                {commercialStats && (
-                  <div><span className="font-semibold">Маржа (1 тн, без НДС):</span> {marginPrefix}{formatCurrency(commercialStats.profitPerTon)} руб. ({marginPrefix}{commercialStats.marginPercent.toFixed(1)}%)</div>
-                )}
-              </div>
+      <div className="px-8 pb-8 space-y-5">
+        
+        {/* COMMERCE SECTION */}
+        <section>
+          <h2 className="text-[12px] font-bold border-b border-black mb-2 uppercase">1. Коммерческий блок</h2>
+          <table className="w-full text-[11px] border-collapse border border-black mb-2">
+            <tbody>
+              <tr>
+                <td className="border border-black p-1.5 font-bold w-[20%] bg-gray-50">Марка стали:</td>
+                <td className="border border-black p-1.5 w-[30%]">{formattedGrade || "Не выбрана"} {gost ? `(${gost})` : ""}</td>
+                <td className="border border-black p-1.5 font-bold w-[20%] bg-gray-50">Профиль:</td>
+                <td className="border border-black p-1.5 w-[30%]">{profileTypeStr} {selectedTarget || "?"} мм ({profileGost})</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-1.5 font-bold bg-gray-50">Длина прутка:</td>
+                <td className="border border-black p-1.5">{orderedLength || "?"} мм</td>
+                <td className="border border-black p-1.5 font-bold bg-gray-50">Объем заказа:</td>
+                <td className="border border-black p-1.5">{orderWeight || "?"} тн</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-1.5 font-bold bg-gray-50">Цена за 1 тн (без НДС):</td>
+                <td className="border border-black p-1.5">{formatCurrency(sellPriceNum)} руб.</td>
+                <td className="border border-black p-1.5 font-bold bg-gray-50">Итого (без НДС):</td>
+                <td className="border border-black p-1.5 font-bold">{formatCurrency(sellTotal)} руб.</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-1.5 font-bold bg-gray-50" colSpan={2}></td>
+                <td className="border border-black p-1.5 font-bold bg-gray-50">Итого с НДС (22%):</td>
+                <td className="border border-black p-1.5 font-bold">{formatCurrency(sellTotal * 1.22)} руб.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        {/* PRODUCTION & SUPPLY SECTION */}
+        <div className="flex gap-4">
+          <section className="flex-[2]">
+            <h2 className="text-[12px] font-bold border-b border-black mb-2 uppercase">2. Производственный блок</h2>
+            <table className="w-full text-[11px] border-collapse border border-black">
+              <tbody>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Длина заготовки:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{displayedRawLength || "?"} мм</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Диаметр заготовки:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{selectedRaw || "?"} мм</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Вытяжка (коэф. {currentDrawCoef ? currentDrawCoef.toFixed(3) : "?"}):</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{displayedTargetLength || "?"} мм</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Технологические концы:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{techEndsMm || "0"} мм</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Полезная длина:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{lengthAfterTechEnds || "0"} мм</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Образование лома:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{totalTechKg} кг</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Деловые остатки:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{totalRemKg} кг</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Длина делового остатка:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{remnantLength || "0"} мм</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section className="flex-1 flex flex-col">
+            <h2 className="text-[12px] font-bold border-b border-black mb-2 uppercase text-center">3. Блок снабжения</h2>
+            <div className="flex-1 border border-black p-3 bg-gray-50 flex flex-col items-center justify-center text-center">
+               <p className="font-bold text-[11px] uppercase mb-1">Сырье к закупке</p>
+               <p className="text-[18px] font-black">{requiredWeight || "?"} <span className="text-[12px] font-normal">тонн</span></p>
+               <div className="mt-3 w-full border-t border-black pt-2 text-[11px] leading-snug">
+                 <p>Круг г/к ф{selectedRaw || "?"} мм</p>
+                 <p className="font-bold">{formattedGrade}</p>
+                 <p>{gost}</p>
+               </div>
             </div>
-          );
-        })}
+          </section>
+        </div>
+
+        {/* ECONOMY SECTION */}
+        <section>
+          <h2 className="text-[12px] font-bold border-b border-black mb-2 mt-2 uppercase">4. Экономика (на 1 тонну)</h2>
+          
+          <table className="w-full text-[11px] border-collapse border border-black">
+            <tbody>
+              <tr>
+                <td className="border border-black p-1.5 w-2/3 bg-gray-50 font-bold">Продажная цена (за 1 тн)</td>
+                <td className="border border-black p-1.5 font-bold text-right">{formatCurrency(sellPriceNum)} руб.</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-1.5 bg-gray-50 font-bold">- Стоимость заготовки</td>
+                <td className="border border-black p-1.5 font-bold text-right">{formatCurrency(rawPriceNum)} руб.</td>
+              </tr>
+              {commercialStats && advancedRemnantStats && rawPriceNum > 0 && (
+                <>
+                  <tr>
+                    <td className="border border-black p-1.5">
+                      <span className="font-bold">- Затраты на отходы (1 тн)</span>
+                      <div className="text-[10px] text-gray-700 mt-1 italic">
+                        В т.ч. Лом ({(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг): {formatCurrency(advancedRemnantStats.techValuePerTon)} руб. | Остаток ({(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг): {formatCurrency(advancedRemnantStats.remValuePerTon)} руб.
+                      </div>
+                    </td>
+                    <td className="border border-black p-1.5 font-bold text-right align-middle">{formatCurrency(commercialStats.lossesPerTon)} руб.</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black p-1.5">
+                      <span className="font-bold">+ Возврат лома и остатков</span>
+                      <div className="text-[10px] text-gray-700 mt-1 italic">
+                        В т.ч. от продажи Лома: {formatCurrency(advancedRemnantStats.techScrapRevenuePerTon)} руб. | от продажи Остатка: {formatCurrency(advancedRemnantStats.remnantRevenuePerTon)} руб.
+                      </div>
+                    </td>
+                    <td className="border border-black p-1.5 font-bold text-right align-middle">{formatCurrency(commercialStats.scrapRevenuePerTon)} руб.</td>
+                  </tr>
+                  <tr className="bg-gray-200">
+                    <td className="border border-black p-2 font-bold uppercase text-[12px]">Маржа расчетная (на 1 тн, без НДС)</td>
+                    <td className="border border-black p-2 font-bold text-right text-[13px] whitespace-nowrap">
+                       {commercialStats.isPositive ? "+" : ""}{formatCurrency(commercialStats.profitPerTon)} руб. 
+                       <span className="ml-1 text-gray-800">({commercialStats.isPositive ? "+" : ""}{commercialStats.marginPercent.toFixed(1)}%)</span>
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </section>
 
         {/* FOOTER */}
-        <div className="mt-16 flex justify-between items-end pt-4" style={{ pageBreakInside: "avoid" }}>
+        <div className="mt-10 flex justify-between items-end pt-4">
            <div className="w-[60%]">
-             <div className="flex items-end gap-2 mb-4">
-                <span className="font-bold text-[13px] whitespace-nowrap">Ответственный менеджер:</span>
+             <div className="flex items-end gap-2 mb-2">
+                <span className="font-bold text-[11px] whitespace-nowrap">Ответственный менеджер:</span>
                 <div className="border-b border-black flex-1 border-dashed"></div>
-                <span className="text-[13px] w-24 text-center">/ ФИО /</span>
+                <span className="text-[11px] w-24 text-center">/ ФИО /</span>
              </div>
              <div className="flex items-end gap-2">
-                <span className="font-bold text-[13px] whitespace-nowrap">Согласовано (Руководитель):</span>
+                <span className="font-bold text-[11px] whitespace-nowrap">Согласовано (Руководитель):</span>
                 <div className="border-b border-black flex-1 border-dashed"></div>
-                <span className="text-[13px] w-24 text-center">/ ФИО /</span>
+                <span className="text-[11px] w-24 text-center">/ ФИО /</span>
              </div>
            </div>
            
            <div className="text-right flex flex-col items-end">
-             <div className="w-24 h-24 border-2 border-gray-400 rounded-full flex items-center justify-center text-[12px] text-gray-500 font-bold -mr-4 rotate-12">
+             <p className="text-[9px] text-gray-500 mb-2">Сформировано в системе (AI Studio)</p>
+             <div className="w-24 h-24 border-2 border-gray-300 rounded-full flex items-center justify-center text-[10px] text-gray-400 font-bold -mr-4 rotate-12">
                М.П.
              </div>
            </div>

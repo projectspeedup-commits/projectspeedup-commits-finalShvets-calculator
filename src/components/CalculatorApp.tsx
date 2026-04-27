@@ -1,5 +1,5 @@
 import { DEFAULT_STEEL_GRADES, formatCurrency, formatInputValue, getGostForGrade, getLengthLabel, getProfileGost, handleNumericInput, HEX_DATA, ROUND_DATA, TECH_COEFS_ROUND } from "../lib/constants";
-import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, Info, LogOut, Package, Printer, RotateCcw, Ruler, Scale, Save } from "lucide-react";
+import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, Info, LogOut, Package, Printer, RotateCcw, Ruler, Scale } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PrintTemplate } from "./PrintTemplate";
 
@@ -37,8 +37,6 @@ export function CalculatorApp({
   const [sellPrice, setSellPrice] = useState("");
 
   const [isCopied, setIsCopied] = useState(false);
-  const [savedCalculations, setSavedCalculations] = useState<any[]>([]);
-  const [isSaved, setIsSaved] = useState(false);
 
   const activeData = profileType === "round" ? ROUND_DATA : HEX_DATA;
   const allGrades = useMemo(() => [...DEFAULT_STEEL_GRADES, ...(customGrades || [])], [customGrades]);
@@ -377,7 +375,6 @@ export function CalculatorApp({
     setLengthInput({ value: "6000", source: "raw" });
     setOrderedLength("6000");
     setSellPrice("");
-    setSavedCalculations([]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -443,28 +440,61 @@ export function CalculatorApp({
 
   const reportText = useMemo(() => {
     const {
-      dateStr, formattedGrade, gost, profileTypeStr, profileGost,
-      sellPriceNum, sellTotal, commercialStats,
-      orderWeightNum, orderedLength
+      dateStr, formattedGrade, gost, profileTypeStr, profileGost, lengthLabel, 
+      sellPriceNum, sellTotal, displayedRawLength, selectedRaw, displayedTargetLength, 
+      currentDrawCoef, techEndsMm, frontCoef, backCoef, lengthAfterTechEnds, 
+      techTons, remTons, requiredWeight, commercialStats, advancedRemnantStats,
+      rawPriceNum, scrapPriceNum, remnantPriceNum, orderWeightNum,
+      orderedLength, remnantLength
     } = reportData;
 
-    const orderWeightStr = reportData.orderWeight || reportData.requiredWeight || (orderWeightNum ? orderWeightNum.toString() : "?");
-
-    let text = `Расчет (ООО "ЗМК Арсенал") - ${dateStr}\n`;
+    let text = `Детали расчета (ООО "ЗМК Арсенал") - ${dateStr}\n`;
     text += `-----------------------------------\n`;
+    text += `Коммерческий блок:\n`;
     text += `Марка стали: ${formattedGrade || "Не выбрана"}${gost ? ` (${gost})` : ""}\n`;
     text += `Профиль: ${profileTypeStr} ${selectedTarget || "?"} мм (${profileGost})\n`;
     text += `Длина: ${orderedLength || "?"} мм\n`;
-    text += `Объем заказа: ${orderWeightStr} тонн\n`;
+    text += `Объем заказа: ${orderWeight || "?"} тонн\n`;
     text += `Цена за 1 тн продукции без НДС: ${formatCurrency(sellPriceNum)} руб.\n`;
     text += `Цена за весь заказ без НДС: ${formatCurrency(sellTotal)} руб.\n`;
     text += `Цена за весь заказ с НДС (22%): ${formatCurrency(sellTotal * 1.22)} руб.\n`;
+    text += `-----------------------------------\n`;
+    text += `Производственный блок:\n`;
+    text += `Заготовка длина: ${displayedRawLength || "?"} мм\n`;
+    text += `Диаметр заготовки: ${selectedRaw || "?"} мм\n`;
+    text += `Вытяжка после волочения: ${displayedTargetLength || "?"} мм. (коф.- ${currentDrawCoef ? currentDrawCoef.toFixed(3) : "?"})\n`;
+    text += `Тех. концы: ${techEndsMm || "0.0"} мм (Перед: ${frontCoef}, Зад: ${backCoef})\n`;
+    text += `Длина после удаления: = ${lengthAfterTechEnds || "0.0"} мм\n`;
     
-    if (commercialStats) {
+    if (advancedRemnantStats) {
+      text += `Лом количество: ${(techTons * 1000).toFixed(1)} кг. (${techTons.toFixed(3)} тн)\n`;
+      text += `Деловые остатки: ${(remTons * 1000).toFixed(1)} кг. (${remTons.toFixed(3)} тн)\n`;
+      text += `Длина делового остатка: ${remnantLength || "0"} мм\n`;
+    } else {
+      text += `Лом количество: ? кг.\n`;
+      text += `Деловые остатки: ? кг.\n`;
+    }
+    text += `-----------------------------------\n`;
+    text += `Блок снабжение:\n`;
+    text += `Сырье к закупке: Круг г/к ф${selectedRaw || "?"} мм ${formattedGrade || "?"} (${gost || "?"}), количество ${requiredWeight || "?"} тн\n`;
+    text += `-----------------------------------\n`;
+    text += `Блок экономика:\n`;
+    text += `Расчет на 1 тонну продукции\n`;
+    text += `Продажная цена (за 1 т): ${formatCurrency(sellPriceNum)} руб.\n`;
+    text += `- Стоимость заготовки: ${formatCurrency(rawPriceNum)} руб.\n`;
+    
+    if (commercialStats && advancedRemnantStats && rawPriceNum > 0) {
+      text += `- Затраты на отходы (1 т): ${formatCurrency(commercialStats.lossesPerTon)} руб.\n`;
+      text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.techValuePerTon)} руб.\n`;
+      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.remValuePerTon)} руб.\n`;
+      
+      text += `+ Возврат лома и остатков: ${formatCurrency(commercialStats.scrapRevenuePerTon)} руб.\n`;
+      text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(scrapPriceNum)} руб/т): ${formatCurrency(advancedRemnantStats.techScrapRevenuePerTon)} руб.\n`;
+      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(remnantPriceNum)} руб/т): ${formatCurrency(advancedRemnantStats.remnantRevenuePerTon)} руб.\n`;
+      
       const marginPrefix = commercialStats.isPositive ? "+" : "";
       text += `Маржа (1 тн, без НДС): ${marginPrefix}${formatCurrency(commercialStats.profitPerTon)} руб. (${marginPrefix}${commercialStats.marginPercent.toFixed(1)}%)\n`;
     }
-    
     return text;
   }, [reportData, selectedTarget, orderWeight]);
 
@@ -483,19 +513,13 @@ export function CalculatorApp({
     document.body.removeChild(textArea);
   };
 
-  const handleSave = () => {
-    if (!reportData.formattedGrade || !reportData.selectedTarget || !reportData.orderWeight) return;
-    setSavedCalculations(prev => [...prev, reportData]);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
-  };
-
   return (
     <>
       <PrintTemplate 
         printText={reportText} 
         reportData={reportData}
-        savedCalculations={savedCalculations}
+        orderWeight={orderWeight}
+        selectedTarget={selectedTarget}
       />
       <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row print:hidden">
 
@@ -545,27 +569,13 @@ export function CalculatorApp({
           {/* HEADER */}
           <header className="sticky top-0 z-40 bg-[#F4F5F4]/90 backdrop-blur-md pt-4 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/50 mb-4 print-hide">
             <div className="flex flex-col">
-              <h1 className="text-xl font-medium tracking-tight text-[#1A1C19] flex items-center gap-3">
+              <h1 className="text-xl font-medium tracking-tight text-[#1A1C19]">
                 Калькулятор <span className="hidden sm:inline">для менеджеров</span>
-                {savedCalculations.length > 0 && (
-                  <span className="bg-blue-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full mt-0.5">
-                    Сохранено: {savedCalculations.length}
-                  </span>
-                )}
               </h1>
               <p className="text-[11px] font-medium text-slate-500 tracking-wide">ООО "ЗМК Арсенал"</p>
             </div>
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
-              <button
-                onClick={handleSave}
-                className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
-                  isSaved ? "bg-green-100 text-green-800" : "bg-blue-100 hover:bg-blue-200 text-blue-800"
-                }`}
-              >
-                {isSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                <span className="hidden sm:inline">{isSaved ? "Сохранено" : "Сохранить"}</span>
-              </button>
               <button
                 onClick={handleCopy}
                 className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
@@ -1142,7 +1152,7 @@ export function CalculatorApp({
                         Чистые потери от отходов: <span className="font-bold">{formatCurrency(commercialStats.netLossesPerTon)} руб./т</span>.
                       </p>
                       <div className="inline-flex items-center bg-white/60 px-3 py-1.5 rounded-lg text-slate-900 font-bold text-sm border border-slate-200">
-                        Рекомендуемая цена (без НДС): {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т
+                        Рекомендуемая цена: {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т
                       </div>
                     </div>
                   </div>
