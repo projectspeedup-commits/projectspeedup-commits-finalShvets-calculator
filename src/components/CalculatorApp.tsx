@@ -1,7 +1,9 @@
 import { DEFAULT_STEEL_GRADES, formatCurrency, formatInputValue, getGostForGrade, getLengthLabel, getProfileGost, handleNumericInput, HEX_DATA, ROUND_DATA, TECH_COEFS_ROUND } from "../lib/constants";
-import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, Info, LogOut, Package, Printer, RotateCcw, Ruler, Scale } from "lucide-react";
+import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, Hexagon, History, Info, LogOut, Package, Printer, RotateCcw, Ruler, Save, Scale, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PrintTemplate } from "./PrintTemplate";
+import { db } from "../lib/firebase";
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, deleteDoc, doc } from "firebase/firestore";
 
 interface CalculatorAppProps {
   adminRawPrices: Record<string, string>;
@@ -11,6 +13,7 @@ interface CalculatorAppProps {
   remnantPricing: Record<string, { round: string; hex: string }>;
   onLogout: () => void;
   isCloudActive: boolean;
+  user: any;
 }
 
 export function CalculatorApp({
@@ -21,6 +24,7 @@ export function CalculatorApp({
   remnantPricing,
   onLogout,
   isCloudActive,
+  user,
 }: CalculatorAppProps) {
   const [profileType, setProfileType] = useState<"round" | "hex">("round");
   const [steelGrade, setSteelGrade] = useState("");
@@ -37,6 +41,9 @@ export function CalculatorApp({
   const [sellPrice, setSellPrice] = useState("");
 
   const [isCopied, setIsCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedCalculations, setSavedCalculations] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   const activeData = profileType === "round" ? ROUND_DATA : HEX_DATA;
   const allGrades = useMemo(() => [...DEFAULT_STEEL_GRADES, ...(customGrades || [])], [customGrades]);
@@ -366,6 +373,80 @@ export function CalculatorApp({
     };
   }, [sellPrice, currentAdminRawPrice, adminScrapPrice, effectiveRemnantPrice, orderWeight, advancedRemnantStats]);
 
+  useEffect(() => {
+    if (!db || !user || user.uid === "local-user") return;
+
+    const q = query(
+      collection(db, "calculations"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const calcs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setSavedCalculations(calcs);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!db || !user || user.uid === "local-user") {
+      alert("Функция сохранения доступна только при активном облачном соединении.");
+      return;
+    }
+    if (!steelGrade || !selectedTarget || !selectedRaw) {
+      alert("Заполните основные поля расчета перед сохранением.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+        profileType,
+        steelGrade,
+        selectedTarget,
+        selectedRaw,
+        orderWeight,
+        orderedLength,
+        sellPrice,
+        rawPriceUsed: currentAdminRawPrice,
+        scrapPriceUsed: adminScrapPrice,
+        remnantPriceUsed: effectiveRemnantPrice,
+        label: `${getProfileGost(profileType)} ${selectedTarget}мм, ${steelGrade}`
+      };
+
+      await addDoc(collection(db, "calculations"), payload);
+      alert("Расчет успешно сохранен");
+    } catch (err) {
+      console.error("Error saving calculation:", err);
+      alert("Ошибка при сохранении");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteCalculation = async (id: string) => {
+    if (!db) return;
+    if (confirm("Удалить этот расчет?")) {
+      await deleteDoc(doc(db, "calculations", id));
+    }
+  };
+
+  const loadCalculation = (calc: any) => {
+    setProfileType(calc.profileType);
+    setSteelGrade(calc.steelGrade);
+    setSelectedTarget(calc.selectedTarget);
+    setSelectedRaw(calc.selectedRaw);
+    setOrderWeight(calc.orderWeight);
+    setOrderedLength(calc.orderedLength || "6000");
+    setSellPrice(calc.sellPrice || "");
+    setShowHistory(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleReset = () => {
     setProfileType("round");
     setSteelGrade("");
@@ -577,6 +658,28 @@ export function CalculatorApp({
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
               <button
+                onClick={() => setShowHistory(!showHistory)}
+                className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
+                    showHistory ? "bg-slate-800 text-white" : "bg-slate-200 hover:bg-slate-300 text-slate-800"
+                }`}
+                title="История расчетов"
+              >
+                <History className="w-4 h-4" />
+                <span className="hidden sm:inline">История</span>
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving || !steelGrade}
+                className="flex items-center justify-center gap-1.5 px-4 h-9 bg-[#4A6572] hover:bg-[#344955] text-white rounded-md transition-colors font-medium text-xs focus:outline-none disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <RotateCcw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Сохранить</span>
+              </button>
+              <button
                 onClick={handleCopy}
                 className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
                   isCopied ? "bg-green-100 text-green-800" : "bg-slate-200 hover:bg-slate-300 text-slate-800"
@@ -603,6 +706,45 @@ export function CalculatorApp({
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start pb-8">
+            {showHistory && (
+              <div className="lg:col-span-2 bg-white rounded-[16px] border border-slate-200 shadow-md p-5 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b">
+                   <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                     <History className="w-5 h-5" /> Сохраненные расчеты
+                   </h3>
+                   <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600">
+                     <RotateCcw className="w-4 h-4" />
+                   </button>
+                </div>
+                {savedCalculations.length === 0 ? (
+                  <p className="text-center py-8 text-slate-400 italic">История пуста</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {savedCalculations.map((calc) => (
+                      <div key={calc.id} className="group relative bg-[#F8FAFA] hover:bg-white border border-slate-200 rounded-xl p-3 transition-all hover:shadow-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {calc.createdAt?.toDate ? calc.createdAt.toDate().toLocaleDateString('ru-RU') : '—'}
+                          </span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); deleteCalculation(calc.id); }}
+                            className="text-slate-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="cursor-pointer" onClick={() => loadCalculation(calc)}>
+                          <div className="font-semibold text-xs text-slate-800 mb-1">{calc.label}</div>
+                          <div className="text-[11px] text-slate-500">Заготовка: {calc.selectedRaw}мм</div>
+                          <div className="text-[11px] text-slate-500">Объем: {calc.orderWeight}тн</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className="space-y-4">
               <section className="bg-white rounded-[16px] border border-slate-200 shadow-sm p-4 sm:p-5 print-shadow-none">
             {/* Segmented Control */}

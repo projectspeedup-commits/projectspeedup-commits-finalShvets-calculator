@@ -212,6 +212,7 @@ export default function App() {
       remnantPricing={remnantPricing}
       onLogout={() => setView("login")}
       isCloudActive={isCloudActive}
+      user={user}
     />
   );
 }
