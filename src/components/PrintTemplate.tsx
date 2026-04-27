@@ -184,7 +184,7 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
         </section>
 
         {/* FOOTER */}
-        <div className="mt-10 flex justify-between items-end pt-4">
+        <div className="mt-10 pt-4">
            <div className="w-[60%]">
              <div className="flex items-end gap-2 mb-2">
                 <span className="font-bold text-[11px] whitespace-nowrap">Ответственный менеджер:</span>
@@ -195,13 +195,6 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
                 <span className="font-bold text-[11px] whitespace-nowrap">Согласовано (Руководитель):</span>
                 <div className="border-b border-black flex-1 border-dashed"></div>
                 <span className="text-[11px] w-24 text-center">/ ФИО /</span>
-             </div>
-           </div>
-           
-           <div className="text-right flex flex-col items-end">
-             <p className="text-[9px] text-gray-500 mb-2">Сформировано в системе (AI Studio)</p>
-             <div className="w-24 h-24 border-2 border-gray-300 rounded-full flex items-center justify-center text-[10px] text-gray-400 font-bold -mr-4 rotate-12">
-               М.П.
              </div>
            </div>
         </div>
