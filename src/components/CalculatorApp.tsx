@@ -471,7 +471,17 @@ export function CalculatorApp({
 
   return (
     <div className="min-h-screen bg-[#F4F5F4] flex flex-col md:flex-row">
-      <PrintTemplate printText={reportText} />
+      <PrintTemplate 
+        printText={reportText} 
+        steelGrade={steelGrade}
+        selectedTarget={selectedTarget}
+        selectedRaw={selectedRaw}
+        orderWeight={orderWeight}
+        currentAdminRawPrice={currentAdminRawPrice}
+        adminScrapPrice={adminScrapPrice}
+        adminRemnantPrice={effectiveRemnantPrice}
+        gost={getGostForGrade(steelGrade)}
+      />
 
       {/* Mobile App Bar */}
       <div className="md:hidden fixed bottom-0 w-full bg-[#F0F4F4]/90 backdrop-blur-md border-t border-slate-200 flex justify-around items-center h-16 z-50 print-hide">
