@@ -428,12 +428,14 @@ export function CalculatorApp({
       requiredWeight,
       commercialStats,
       advancedRemnantStats,
+      orderedLength,
+      remnantLength,
     };
   }, [
     steelGrade, profileType, orderedLength, currentAdminRawPrice, sellPrice, orderWeight, 
     adminScrapPrice, effectiveRemnantPrice, selectedTarget, selectedRaw, displayedRawLength, 
     displayedTargetLength, currentDrawCoef, techEndsMm, frontCoef, backCoef, lengthAfterTechEnds, 
-    requiredWeight, commercialStats, advancedRemnantStats
+    requiredWeight, commercialStats, advancedRemnantStats, remnantLength
   ]);
 
   const reportText = useMemo(() => {
@@ -442,7 +444,8 @@ export function CalculatorApp({
       sellPriceNum, sellTotal, displayedRawLength, selectedRaw, displayedTargetLength, 
       currentDrawCoef, techEndsMm, frontCoef, backCoef, lengthAfterTechEnds, 
       techTons, remTons, requiredWeight, commercialStats, advancedRemnantStats,
-      rawPriceNum, scrapPriceNum, remnantPriceNum, orderWeightNum
+      rawPriceNum, scrapPriceNum, remnantPriceNum, orderWeightNum,
+      orderedLength, remnantLength
     } = reportData;
 
     let text = `Детали расчета (ООО "ЗМК Арсенал") - ${dateStr}\n`;
@@ -450,10 +453,11 @@ export function CalculatorApp({
     text += `Коммерческий блок:\n`;
     text += `Марка стали: ${formattedGrade || "Не выбрана"}${gost ? ` (${gost})` : ""}\n`;
     text += `Профиль: ${profileTypeStr} ${selectedTarget || "?"} мм (${profileGost})\n`;
-    text += `Длина: ${lengthLabel}\n`;
+    text += `Длина: ${orderedLength || "?"} мм\n`;
     text += `Объем заказа: ${orderWeight || "?"} тонн\n`;
     text += `Цена за 1 тн продукции без НДС: ${formatCurrency(sellPriceNum)} руб.\n`;
     text += `Цена за весь заказ без НДС: ${formatCurrency(sellTotal)} руб.\n`;
+    text += `Цена за весь заказ с НДС (22%): ${formatCurrency(sellTotal * 1.22)} руб.\n`;
     text += `-----------------------------------\n`;
     text += `Производственный блок:\n`;
     text += `Заготовка длина: ${displayedRawLength || "?"} мм\n`;
@@ -465,6 +469,7 @@ export function CalculatorApp({
     if (advancedRemnantStats) {
       text += `Лом количество: ${(techTons * 1000).toFixed(1)} кг. (${techTons.toFixed(3)} тн)\n`;
       text += `Деловые остатки: ${(remTons * 1000).toFixed(1)} кг. (${remTons.toFixed(3)} тн)\n`;
+      text += `Длина делового остатка: ${remnantLength || "0"} мм\n`;
     } else {
       text += `Лом количество: ? кг.\n`;
       text += `Деловые остатки: ? кг.\n`;

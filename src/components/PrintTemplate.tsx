@@ -15,6 +15,8 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
     profileTypeStr,
     profileGost,
     lengthLabel,
+    orderedLength,
+    remnantLength,
     rawPriceNum,
     sellPriceNum,
     sellTotal,
@@ -59,7 +61,7 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
               </tr>
               <tr>
                 <td className="border border-black p-1.5 font-bold bg-gray-50">Длина прутка:</td>
-                <td className="border border-black p-1.5">{lengthLabel}</td>
+                <td className="border border-black p-1.5">{orderedLength || "?"} мм</td>
                 <td className="border border-black p-1.5 font-bold bg-gray-50">Объем заказа:</td>
                 <td className="border border-black p-1.5">{orderWeight || "?"} тн</td>
               </tr>
@@ -68,6 +70,11 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
                 <td className="border border-black p-1.5">{formatCurrency(sellPriceNum)} руб.</td>
                 <td className="border border-black p-1.5 font-bold bg-gray-50">Итого (без НДС):</td>
                 <td className="border border-black p-1.5 font-bold">{formatCurrency(sellTotal)} руб.</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-1.5 font-bold bg-gray-50" colSpan={2}></td>
+                <td className="border border-black p-1.5 font-bold bg-gray-50">Итого с НДС (22%):</td>
+                <td className="border border-black p-1.5 font-bold">{formatCurrency(sellTotal * 1.22)} руб.</td>
               </tr>
             </tbody>
           </table>
@@ -106,6 +113,10 @@ export function PrintTemplate({ reportData, orderWeight, selectedTarget }: Print
                 <tr>
                   <td className="border border-black p-1.5 bg-gray-50 font-medium">Деловые остатки:</td>
                   <td className="border border-black p-1.5 font-bold text-center">{totalRemKg} кг</td>
+                </tr>
+                <tr>
+                  <td className="border border-black p-1.5 bg-gray-50 font-medium">Длина делового остатка:</td>
+                  <td className="border border-black p-1.5 font-bold text-center">{remnantLength || "0"} мм</td>
                 </tr>
               </tbody>
             </table>
