@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Briefcase, Calculator, Check, Circle, Copy, 
 import { useEffect, useMemo, useState } from "react";
 import { PrintTemplate } from "./PrintTemplate";
 import { db } from "../lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
 
 interface CalculatorAppProps {
   adminRawPrices: Record<string, string>;
@@ -42,8 +42,10 @@ export function CalculatorApp({
 
   const [isCopied, setIsCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [savedCalculations, setSavedCalculations] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
   const activeData = profileType === "round" ? ROUND_DATA : HEX_DATA;
   const allGrades = useMemo(() => [...DEFAULT_STEEL_GRADES, ...(customGrades || [])], [customGrades]);
@@ -378,25 +380,35 @@ export function CalculatorApp({
 
     const q = query(
       collection(db, "calculations"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
+      where("userId", "==", user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const calcs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const calcs = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => {
+          const timeA = a.createdAt?.toMillis?.() || 0;
+          const timeB = b.createdAt?.toMillis?.() || 0;
+          return timeB - timeA;
+        });
       setSavedCalculations(calcs);
     });
 
     return () => unsubscribe();
   }, [user]);
 
+  const showNotify = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   const handleSave = async () => {
     if (!db || !user || user.uid === "local-user") {
-      alert("Функция сохранения доступна только при активном облачном соединении.");
+      showNotify("Функция сохранения доступна только при активном облачном соединении.", "error");
       return;
     }
     if (!steelGrade || !selectedTarget || !selectedRaw) {
-      alert("Заполните основные поля расчета перед сохранением.");
+      showNotify("Заполните основные поля расчета перед сохранением.", "error");
       return;
     }
 
@@ -419,10 +431,10 @@ export function CalculatorApp({
       };
 
       await addDoc(collection(db, "calculations"), payload);
-      alert("Расчет успешно сохранен");
+      showNotify("Расчет успешно сохранен");
     } catch (err) {
       console.error("Error saving calculation:", err);
-      alert("Ошибка при сохранении");
+      showNotify("Ошибка при сохранении", "error");
     } finally {
       setIsSaving(false);
     }
@@ -432,6 +444,47 @@ export function CalculatorApp({
     if (!db) return;
     if (confirm("Удалить этот расчет?")) {
       await deleteDoc(doc(db, "calculations", id));
+      showNotify("Расчет удален");
+    }
+  };
+
+  const clearAllHistory = async () => {
+    if (!db || !user || user.uid === "local-user") {
+      showNotify("Удаление истории доступно только при активном облачном соединении.", "error");
+      return;
+    }
+    
+    if (confirm("Вы уверены, что хотите удалить ВСЮ историю расчетов? Это действие необратимо.")) {
+      setIsClearing(true);
+      const q = query(collection(db, "calculations"), where("userId", "==", user.uid));
+      try {
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+          showNotify("История уже пуста");
+          setIsClearing(false);
+          return;
+        }
+
+        const totalDocs = snapshot.docs.length;
+        const BATCH_SIZE = 500;
+        
+        // Split documents into chunks of 500
+        for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
+          const batch = writeBatch(db);
+          const chunk = snapshot.docs.slice(i, i + BATCH_SIZE);
+          chunk.forEach((d) => {
+            batch.delete(d.ref);
+          });
+          await batch.commit();
+        }
+        
+        showNotify("История полностью очищена");
+      } catch (err) {
+        console.error("Error clearing history:", err);
+        showNotify("Ошибка при очистке истории: " + (err instanceof Error ? err.message : String(err)), "error");
+      } finally {
+        setIsClearing(false);
+      }
     }
   };
 
@@ -647,6 +700,16 @@ export function CalculatorApp({
 
       <div className="flex-1 md:ml-[88px] pb-24 md:pb-8 relative">
         <div className="max-w-[1024px] xl:max-w-[1440px] w-full px-4 sm:px-6 lg:px-8 mx-auto relative z-10">
+          {notification && (
+            <div className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl z-[100] animate-in fade-in zoom-in slide-in-from-top-4 duration-300 border ${
+              notification.type === 'success' ? 'bg-green-600 border-green-500 text-white' : 'bg-red-600 border-red-500 text-white'
+            }`}>
+              <div className="flex items-center gap-3 text-sm font-semibold">
+                {notification.type === 'success' ? <Check className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                {notification.message}
+              </div>
+            </div>
+          )}
           {/* HEADER */}
           <header className="sticky top-0 z-40 bg-[#F4F5F4]/90 backdrop-blur-md pt-4 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/50 mb-4 print-hide">
             <div className="flex flex-col">
@@ -712,9 +775,25 @@ export function CalculatorApp({
                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
                      <History className="w-5 h-5" /> Сохраненные расчеты
                    </h3>
-                   <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600">
-                     <RotateCcw className="w-4 h-4" />
-                   </button>
+                   <div className="flex items-center gap-4">
+                     {savedCalculations.length > 0 && (
+                       <button 
+                         onClick={clearAllHistory}
+                         disabled={isClearing}
+                         className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
+                       >
+                         {isClearing ? (
+                           <RotateCcw className="w-3 h-3 animate-spin" />
+                         ) : (
+                           <Trash2 className="w-3 h-3" />
+                         )}
+                         {isClearing ? "Очистка..." : "Очистить всё"}
+                       </button>
+                     )}
+                     <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600">
+                       <RotateCcw className="w-4 h-4" />
+                     </button>
+                   </div>
                 </div>
                 {savedCalculations.length === 0 ? (
                   <p className="text-center py-8 text-slate-400 italic">История пуста</p>
