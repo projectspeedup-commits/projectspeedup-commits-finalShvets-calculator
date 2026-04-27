@@ -201,6 +201,8 @@ export default function App() {
     }
   };
 
+  const toggleTheme = () => setIsDarkMode(prev => !prev);
+
   if (view === "login") {
     return (
       <LoginScreen 
@@ -208,7 +210,7 @@ export default function App() {
         onAdminLogin={() => setView("admin")} 
         isCloudActive={isCloudActive}
         isDarkMode={isDarkMode}
-        toggleTheme={() => setIsDarkMode(!isDarkMode)}
+        toggleTheme={toggleTheme}
       />
     );
   }
@@ -225,7 +227,7 @@ export default function App() {
         onLogout={() => setView("login")}
         isCloudActive={isCloudActive}
         isDarkMode={isDarkMode}
-        toggleTheme={() => setIsDarkMode(!isDarkMode)}
+        toggleTheme={toggleTheme}
       />
     );
   }
@@ -241,7 +243,7 @@ export default function App() {
       isCloudActive={isCloudActive}
       user={user}
       isDarkMode={isDarkMode}
-      toggleTheme={() => setIsDarkMode(!isDarkMode)}
+      toggleTheme={toggleTheme}
     />
   );
 }
