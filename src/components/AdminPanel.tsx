@@ -348,7 +348,7 @@ export function AdminPanel({
                       placeholder="20 000"
                       value={formatInputValue(scrap)}
                       onChange={(e) => handleNumericInput(e, setScrap)}
-                      className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 dark:focus:border-white focus:outline-none focus:ring-0 transition-colors dark:text-white"
+                      className="w-full bg-[#F0F4F4] dark:bg-slate-800/50 border-b border-slate-300 dark:border-slate-700 rounded-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 dark:focus:border-slate-200 focus:outline-none focus:ring-0 transition-colors dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium text-sm">руб</span>
                   </div>
@@ -362,7 +362,7 @@ export function AdminPanel({
                       placeholder="35 000"
                       value={formatInputValue(remnant)}
                       onChange={(e) => handleNumericInput(e, setRemnant)}
-                      className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 dark:focus:border-white focus:outline-none focus:ring-0 transition-colors dark:text-white"
+                      className="w-full bg-[#F0F4F4] dark:bg-slate-800/50 border-b border-slate-300 dark:border-slate-700 rounded-t-lg pl-3 pr-12 h-12 text-sm focus:border-slate-800 dark:focus:border-slate-200 focus:outline-none focus:ring-0 transition-colors dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-sm">руб</span>
                   </div>
@@ -379,12 +379,12 @@ export function AdminPanel({
                   placeholder="Например: ст.50"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
-                  className="w-full bg-[#F0F4F4] dark:bg-slate-800 border-b border-slate-400 dark:border-slate-600 rounded-t-lg px-4 h-12 text-sm focus:border-slate-800 dark:focus:border-white focus:outline-none focus:ring-0 transition-colors dark:text-white"
+                  className="w-full bg-[#F0F4F4] dark:bg-slate-800/50 border-b border-slate-300 dark:border-slate-700 rounded-t-lg px-4 h-12 text-sm focus:border-slate-800 dark:focus:border-slate-200 focus:outline-none focus:ring-0 transition-colors dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
                 <button
                   onClick={handleAddGrade}
                   disabled={!newGrade.trim()}
-                  className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50 disabled:bg-slate-100 flex items-center justify-center gap-2 rounded-full h-11 px-6 text-sm font-medium transition-colors"
+                  className="w-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-white disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800 flex items-center justify-center gap-2 rounded-full h-11 px-6 text-sm font-medium transition-colors border border-slate-200 dark:border-slate-600 shadow-sm"
                 >
                   <Plus className="w-5 h-5" />
                   <span>Добавить</span>
