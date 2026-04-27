@@ -34,7 +34,7 @@ export function LoginScreen({ onManagerLogin, onAdminLogin, isCloudActive, isDar
       </button>
       <div className="flex flex-col gap-6 w-full max-w-md">
         
-        <div className="flex flex-col items-center mb-6">
+        <div className="flex flex-col items-center mb-6 text-center">
           <div className="w-16 h-16 bg-slate-700 dark:bg-slate-600 rounded-2xl flex items-center justify-center shadow-md mb-4 text-white">
             <Calculator className="w-8 h-8" />
           </div>
@@ -43,16 +43,15 @@ export function LoginScreen({ onManagerLogin, onAdminLogin, isCloudActive, isDar
         </div>
 
         {/* Manager Card */}
-        <div className="bg-white dark:bg-[#1A1C19] p-6 sm:p-8 rounded-[24px] shadow-sm border border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-3 mb-3">
+        <div className="bg-white dark:bg-[#1A1C19] p-6 sm:p-8 rounded-[24px] shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col items-center">
+          <div className="flex items-center gap-3 mb-3 justify-center">
             <User className="w-6 h-6 text-slate-700 dark:text-slate-400" strokeWidth={1.5} />
             <h2 className="text-xl font-normal text-[#1A1C19] dark:text-white">Вход для менеджеров</h2>
           </div>
-          <p className="text-sm text-[#43483F] dark:text-slate-400 mb-6 leading-relaxed">
-            Свободный доступ к калькулятору для расчета заказов.
-            {isCloudActive
-              ? " Цены на сырье автоматически загружаются из облака."
-              : " Цены синхронизированы локально."}
+          <p className="text-sm text-[#43483F] dark:text-slate-400 mb-6 leading-relaxed text-center">
+            Калькулятору для расчета заказов.
+            <br />
+            Для менеджеров ООО "ЗМК Арсенал"
           </p>
           <button
             onClick={onManagerLogin}
@@ -63,8 +62,8 @@ export function LoginScreen({ onManagerLogin, onAdminLogin, isCloudActive, isDar
         </div>
 
         {/* Admin Card */}
-        <div className="bg-white dark:bg-[#1A1C19] p-6 sm:p-8 rounded-[24px] shadow-sm border border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-3 mb-5">
+        <div className="bg-white dark:bg-[#1A1C19] p-6 sm:p-8 rounded-[24px] shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col items-center">
+          <div className="flex items-center gap-3 mb-5 justify-center">
             <Lock className="w-6 h-6 text-slate-700 dark:text-slate-400" strokeWidth={1.5} />
             <h2 className="text-xl font-normal text-[#1A1C19] dark:text-white">Вход для администратора</h2>
           </div>

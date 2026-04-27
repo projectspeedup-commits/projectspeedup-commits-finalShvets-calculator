@@ -203,47 +203,61 @@ export default function App() {
 
   const toggleTheme = () => setIsDarkMode(prev => !prev);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [view]);
+
   if (view === "login") {
     return (
-      <LoginScreen 
-        onManagerLogin={() => setView("manager")} 
-        onAdminLogin={() => setView("admin")} 
-        isCloudActive={isCloudActive}
-        isDarkMode={isDarkMode}
-        toggleTheme={toggleTheme}
-      />
+      <div className="min-h-screen bg-[#F0F4F4] dark:bg-[#111310] flex flex-col">
+        <LoginScreen 
+          onManagerLogin={() => setView("manager")} 
+          onAdminLogin={() => setView("admin")} 
+          isCloudActive={isCloudActive}
+          isDarkMode={isDarkMode}
+          toggleTheme={toggleTheme}
+        />
+      </div>
     );
   }
 
   if (view === "admin") {
     return (
-      <AdminPanel
-        initialRawPrices={globalRawPrices}
-        initialScrap={globalScrapPrice}
-        initialRemnant={globalRemnantPrice}
-        initialCustomGrades={customGrades}
-        initialRemnantPricing={remnantPricing}
-        onSave={handleSaveGlobal}
-        onLogout={() => setView("login")}
-        isCloudActive={isCloudActive}
-        isDarkMode={isDarkMode}
-        toggleTheme={toggleTheme}
-      />
+      <div className="min-h-screen bg-[#F0F4F4] dark:bg-[#111310] flex flex-col">
+        <div className="flex-1 w-full max-w-[1600px] mx-auto px-0 sm:px-4 lg:px-8">
+          <AdminPanel
+            initialRawPrices={globalRawPrices}
+            initialScrap={globalScrapPrice}
+            initialRemnant={globalRemnantPrice}
+            initialCustomGrades={customGrades}
+            initialRemnantPricing={remnantPricing}
+            onSave={handleSaveGlobal}
+            onLogout={() => setView("login")}
+            isCloudActive={isCloudActive}
+            isDarkMode={isDarkMode}
+            toggleTheme={toggleTheme}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <CalculatorApp
-      adminRawPrices={globalRawPrices}
-      adminScrapPrice={globalScrapPrice}
-      adminRemnantPrice={globalRemnantPrice}
-      customGrades={customGrades}
-      remnantPricing={remnantPricing}
-      onLogout={() => setView("login")}
-      isCloudActive={isCloudActive}
-      user={user}
-      isDarkMode={isDarkMode}
-      toggleTheme={toggleTheme}
-    />
+    <div className="min-h-screen bg-[#F0F4F4] dark:bg-[#111310] flex flex-col">
+      <div className="flex-1 w-full max-w-[1600px] mx-auto px-0 sm:px-4 lg:px-6 xl:px-8">
+        <CalculatorApp
+          adminRawPrices={globalRawPrices}
+          adminScrapPrice={globalScrapPrice}
+          adminRemnantPrice={globalRemnantPrice}
+          customGrades={customGrades}
+          remnantPricing={remnantPricing}
+          onLogout={() => setView("login")}
+          isCloudActive={isCloudActive}
+          user={user}
+          isDarkMode={isDarkMode}
+          toggleTheme={toggleTheme}
+        />
+      </div>
+    </div>
   );
 }

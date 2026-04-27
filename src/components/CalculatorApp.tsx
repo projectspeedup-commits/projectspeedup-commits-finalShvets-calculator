@@ -627,17 +627,17 @@ export function CalculatorApp({
     }
     text += `-----------------------------------\n`;
     text += `Блок снабжение:\n`;
-    text += `Сырье к закупке: Круг г/к ф${selectedRaw || "?"} мм ${formattedGrade || "?"} (${gost || "?"}), количество ${requiredWeight || "?"} тн\n`;
+    text += `Сырье к закупке: ${profileTypeStr === "Круг" ? "Круг г/к ф" : "Шестигранник г/к s"}${selectedRaw || "?"} мм ${formattedGrade || "?"} (${gost || "?"}), количество ${requiredWeight || "?"} тн.\n`;
     text += `-----------------------------------\n`;
     text += `Блок экономика:\n`;
     text += `Расчет на 1 тонну продукции\n`;
-    text += `Продажная цена (за 1 т): ${formatCurrency(sellPriceNum)} руб.\n`;
-    text += `- Стоимость заготовки: ${formatCurrency(rawPriceNum)} руб.\n`;
+    text += `Продажная цена (за 1 т): без НДС ${formatCurrency(sellPriceNum)} руб.\n`;
+    text += `- Стоимость заготовки: без НДС ${formatCurrency(rawPriceNum)} руб.\n`;
     
     if (commercialStats && advancedRemnantStats && rawPriceNum > 0) {
       text += `- Затраты на отходы (1 т): ${formatCurrency(commercialStats.lossesPerTon)} руб.\n`;
       text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.techValuePerTon)} руб.\n`;
-      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг): ${formatCurrency(advancedRemnantStats.remValuePerTon)} руб.\n`;
+      text += `  Деловой остаток (${(advancedRemnantStats.remTonsPerTon * 1000).toFixed(1)} кг):  ${formatCurrency(advancedRemnantStats.remValuePerTon)} руб.\n`;
       
       text += `+ Возврат лома и остатков: ${formatCurrency(commercialStats.scrapRevenuePerTon)} руб.\n`;
       text += `  Лом (${(advancedRemnantStats.techTonsPerTon * 1000).toFixed(1)} кг × ${formatCurrency(scrapPriceNum)} руб/т): ${formatCurrency(advancedRemnantStats.techScrapRevenuePerTon)} руб.\n`;
@@ -750,7 +750,10 @@ export function CalculatorApp({
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
               <button
-                onClick={() => setShowHistory(!showHistory)}
+                onClick={() => {
+                  setShowHistory(!showHistory);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
                 className={`flex items-center justify-center gap-1.5 px-4 h-9 rounded-md transition-colors font-medium text-xs focus:outline-none ${
                     showHistory 
                       ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900" 
@@ -821,7 +824,13 @@ export function CalculatorApp({
                          {isClearing ? "Очистка..." : "Очистить всё"}
                        </button>
                      )}
-                     <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600">
+                     <button 
+                       onClick={() => {
+                         setShowHistory(false);
+                         window.scrollTo({ top: 0, behavior: "smooth" });
+                       }} 
+                       className="text-slate-400 hover:text-slate-600"
+                     >
                        <RotateCcw className="w-4 h-4" />
                      </button>
                    </div>
@@ -829,7 +838,7 @@ export function CalculatorApp({
                 {savedCalculations.length === 0 ? (
                   <p className="text-center py-8 text-slate-400 italic">История пуста</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
                     {savedCalculations.map((calc) => (
                       <div key={calc.id} className="group relative bg-[#F8FAFA] dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 transition-all hover:shadow-sm">
                         <div className="flex justify-between items-start mb-2">
@@ -858,7 +867,7 @@ export function CalculatorApp({
             <div className="space-y-4">
               <section className="bg-white dark:bg-[#1A1C19] rounded-[16px] border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-5 print-shadow-none transition-colors duration-300">
             {/* Segmented Control */}
-            <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex max-w-[280px] mx-auto mb-6 print-hide">
+            <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex w-full sm:max-w-[280px] sm:mx-auto mb-6 print-hide">
               <button
                 onClick={() => setProfileType("round")}
                 className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200 focus:outline-none ${
@@ -1402,7 +1411,7 @@ export function CalculatorApp({
                         Чистые потери от отходов: <span className="font-bold">{formatCurrency(commercialStats.netLossesPerTon)} руб./т</span>.
                       </p>
                       <div className="inline-flex items-center bg-white/60 dark:bg-white/10 px-3 py-1.5 rounded-lg text-slate-900 dark:text-white font-bold text-sm border border-slate-200 dark:border-white/10 shadow-sm">
-                        Рекомендуемая цена: {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т
+                        Рекомендуемая цена: {formatCurrency(Number(sellPrice) + Number(commercialStats.netLossesPerTon))} руб./т (БЕЗ НДС)
                       </div>
                     </div>
                   </div>

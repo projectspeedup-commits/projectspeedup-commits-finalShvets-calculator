@@ -1,5 +1,5 @@
 import { DEFAULT_STEEL_GRADES, formatInputValue, handleNumericInput } from "../lib/constants";
-import { Cloud, LogOut, Plus, Trash2, Settings, Moon, Sun } from "lucide-react";
+import { Cloud, LogOut, Plus, Trash2, Settings, Moon, Sun, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface AdminPanelProps {
@@ -53,6 +53,26 @@ export function AdminPanel({
   }, [initialRawPrices, initialScrap, initialRemnant, initialCustomGrades, initialRemnantPricing]);
 
   const allGrades = [...DEFAULT_STEEL_GRADES, ...customGrades];
+
+  const RemnantPricingTooltip = () => (
+    <div className="group relative inline-block ml-1 align-middle">
+      <Info className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 cursor-help" />
+      <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-[#1A1C19] dark:bg-slate-700 text-white text-[10px] rounded-xl shadow-2xl w-60 z-[100] transition-all normal-case font-normal text-left border border-slate-700">
+        <div className="font-bold mb-1 border-b border-white/10 pb-1 text-[11px]">Типы остатков</div>
+        <div className="space-y-2 opacity-95">
+          <div>
+            <span className="text-sky-300 font-bold uppercase tracking-tighter">Деловой остаток:</span>
+            <p className="mt-0.5 leading-relaxed">Длинные куски (обычно &gt;2.5м), которые можно продать как полноценную заготовку по цене делового остатка.</p>
+          </div>
+          <div>
+            <span className="text-red-400 font-bold uppercase tracking-tighter">По цене лома:</span>
+            <p className="mt-0.5 leading-relaxed">Мелкие обрезки и технические концы, которые не имеют складской ценности и продаются по весу лома.</p>
+          </div>
+        </div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-[#1A1C19] dark:border-t-slate-700"></div>
+      </div>
+    </div>
+  );
 
   const handlePriceChange = (grade: string, value: string) => {
     let val = value.replace(/\s/g, "").replace(/,/g, ".");
@@ -167,7 +187,7 @@ export function AdminPanel({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 md:ml-[88px] pb-24 md:pb-8 pt-8 px-4 sm:px-8 max-w-[1200px] mx-auto w-full">
+      <div className="flex-1 md:ml-[88px] pb-24 md:pb-8 pt-8 px-4 sm:px-8 w-full">
         <div className="mb-8">
           <h2 className="text-3xl font-normal tracking-tight text-[#1A1C19] dark:text-white">
             {isCloudActive ? "Облачные настройки" : "Локальные настройки"}
@@ -196,9 +216,15 @@ export function AdminPanel({
                     <thead className="text-[#43483F] dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-transparent">
                       <tr>
                         <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider">Марка стали</th>
-                        <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-right">Цена (руб/тн)</th>
-                        <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-center">Круг</th>
-                        <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-center">Шестигранник</th>
+                        <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-right">Цена (руб/тн) БЕЗ НДС</th>
+                        <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-center">
+                          Круг
+                          <RemnantPricingTooltip />
+                        </th>
+                        <th className="px-6 py-3 text-xs font-medium uppercase tracking-wider text-center">
+                          Шестигранник
+                          <RemnantPricingTooltip />
+                        </th>
                         <th className="px-4 py-3 w-12"></th>
                       </tr>
                     </thead>
@@ -223,28 +249,44 @@ export function AdminPanel({
                               />
                             </td>
                             <td className="px-6 py-4 text-center">
-                              <select
-                                value={pricing.round}
-                                onChange={(e) => handlePricingChange(grade, "round", e.target.value)}
-                                className={`bg-[#F0F4F4] dark:bg-slate-800 text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] mx-auto border-transparent focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 ${
-                                  pricing.round === "scrap" ? "text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20" : "text-[#1A1C19] dark:text-white"
-                                }`}
-                              >
-                                <option value="remnant">Деловой остаток</option>
-                                <option value="scrap">По цене лома</option>
-                              </select>
+                              <div className="group relative flex justify-center">
+                                <select
+                                  value={pricing.round}
+                                  onChange={(e) => handlePricingChange(grade, "round", e.target.value)}
+                                  className={`bg-[#F0F4F4] dark:bg-slate-800 text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] border-transparent focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 ${
+                                    pricing.round === "scrap" ? "text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20" : "text-[#1A1C19] dark:text-white"
+                                  }`}
+                                >
+                                  <option value="remnant">Деловой остаток</option>
+                                  <option value="scrap">По цене лома</option>
+                                </select>
+                                <div className="invisible group-hover:visible absolute bottom-full mb-2 p-2 bg-slate-800 dark:bg-slate-700 text-white text-[10px] rounded shadow-lg w-48 z-[100] pointer-events-none text-center">
+                                  {pricing.round === "remnant" 
+                                    ? "Расчет по цене делового остатка (дороже)" 
+                                    : "Расчет по цене металлолома (дешевле)"}
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-slate-800 dark:border-t-slate-700"></div>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-6 py-4 text-center">
-                              <select
-                                value={pricing.hex}
-                                onChange={(e) => handlePricingChange(grade, "hex", e.target.value)}
-                                className={`bg-[#F0F4F4] dark:bg-slate-800 text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] mx-auto border-transparent focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 ${
-                                  pricing.hex === "scrap" ? "text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20" : "text-[#1A1C19] dark:text-white"
-                                }`}
-                              >
-                                <option value="remnant">Деловой остаток</option>
-                                <option value="scrap">По цене лома</option>
-                              </select>
+                              <div className="group relative flex justify-center">
+                                <select
+                                  value={pricing.hex}
+                                  onChange={(e) => handlePricingChange(grade, "hex", e.target.value)}
+                                  className={`bg-[#F0F4F4] dark:bg-slate-800 text-xs font-medium rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer w-[150px] border-transparent focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 ${
+                                    pricing.hex === "scrap" ? "text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20" : "text-[#1A1C19] dark:text-white"
+                                  }`}
+                                >
+                                  <option value="remnant">Деловой остаток</option>
+                                  <option value="scrap">По цене лома</option>
+                                </select>
+                                <div className="invisible group-hover:visible absolute bottom-full mb-2 p-2 bg-slate-800 dark:bg-slate-700 text-white text-[10px] rounded shadow-lg w-48 z-[100] pointer-events-none text-center">
+                                  {pricing.hex === "remnant" 
+                                    ? "Расчет по цене делового остатка (дороже)" 
+                                    : "Расчет по цене металлолома (дешевле)"}
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-slate-800 dark:border-t-slate-700"></div>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-4 py-4 text-center align-middle">
                               {isCustom ? (
@@ -298,7 +340,7 @@ export function AdminPanel({
               <h3 className="text-base font-medium text-[#1A1C19] dark:text-white">Базовые цены</h3>
               <div className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#43483F] dark:text-slate-400">Цена лома (руб/тн)</label>
+                  <label className="block text-xs font-medium text-[#43483F] dark:text-slate-400">Цена лома (руб/тн) БЕЗ НДС</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -312,7 +354,7 @@ export function AdminPanel({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#43483F] dark:text-slate-400">Цена делового остатка (руб/тн)</label>
+                  <label className="block text-xs font-medium text-[#43483F] dark:text-slate-400">Цена делового остатка (руб/тн) БЕЗ НДС</label>
                   <div className="relative">
                     <input
                       type="text"
